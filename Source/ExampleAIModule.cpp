@@ -1,5 +1,4 @@
 #include "ExampleAIModule.h" 
-//Test
 using namespace BWAPI;
 
 bool analyzed;
