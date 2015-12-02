@@ -299,9 +299,7 @@ void ExampleAIModule::trainUnits(Unit* trainer, BWAPI::UnitType unit, int amount
 			//If so, add a order to the training queue equal to the amount specified
 			for(int a = 0; a < amount && canBuild; a++)
 			{
-				
-				if(Broodwar->self()->supplyTotal() - Broodwar->self()->supplyUsed() >= unit.supplyRequired() &&
-					Broodwar->self()->minerals() >= unit.mineralPrice())
+				if(this->hasResFor(unit))
 				{
 					if(!trainer->train(unit))
 					{
@@ -329,7 +327,7 @@ void ExampleAIModule::constructBuilding(std::vector<BWAPI::TilePosition> possiti
 				for(std::vector<TilePosition>::const_iterator posItr = possitions.begin(); posItr != possitions.end(); posItr++)
 				{
 					TilePosition pos = (*posItr);
-					if(Broodwar->self()->minerals() >= building.mineralPrice() && Broodwar->self()->gas() >= building.gasPrice())
+					if(this->hasResFor(building))
 					{
 						//Check if building can be constructed at DESIGNATED position
 						if(Broodwar->canBuildHere(worker, pos, building, false))
@@ -341,25 +339,25 @@ void ExampleAIModule::constructBuilding(std::vector<BWAPI::TilePosition> possiti
 								//BWAPI::UnitCommand::build(
 								//bool canBuild = worker->issueCommand(UnitCommand::build(worker,pos,building));
 								bool canBuild = worker->build(pos, building);
-								std::string message = "";
 								if(canBuild)
 								{
-									message = "Constructing " + building.getName();
+									Broodwar->printf("Constructing %s", building.getName().c_str());
+									break;
 								}else if(!canBuild && !Broodwar->canBuildHere(worker, pos, building, true))
 								{
 									worker->move(Position(pos), false);
-									message = "Moving worker to build area!";
+									Broodwar->printf("Moving worker to build area!");
+									break;
 								}else
 								{
-									message = worker->getType().getName() + "could not build " + building.getName();
+									Broodwar->printf("%s could not build %s!",worker->getType().getName().c_str(), building.getName().c_str());
 								}
-								Broodwar->printf(message.c_str());
 							}else
 								Broodwar->printf("Worker cannot reach designated tile position!");
 						}else
 							Broodwar->printf("Building cannot be built at designated position!");
 					}else
-						Broodwar->printf("Not enough materials to begin construction!");
+						Broodwar->printf("Not enough materials to begin construction of!");
 				}
 			}else
 				Broodwar->printf("Designated building is not of type: Building!");
@@ -439,7 +437,11 @@ bool ExampleAIModule::hasResFor(UnitType type)const
 	bool result = true;
 	if(Broodwar->self()->minerals() < type.mineralPrice() || Broodwar->self()->gas() < type.gasPrice())
 	{
-		result = false;
+		if(type.supplyProvided() < 0)
+		{
+			if(type.supplyRequired() < Broodwar->self()->supplyTotal() - Broodwar->self()->supplyUsed())
+				result = false;
+		}
 	}
 	return result;
 }
