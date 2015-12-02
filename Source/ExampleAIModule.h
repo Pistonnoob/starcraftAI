@@ -17,10 +17,10 @@ class ExampleAIModule : public BWAPI::AIModule
 {
 private:
 	bool steps[5];
-	bool stepsCompleted[5];
 	std::set<Unit*> builders;
-	//std::vector<std::pair<Unit*, int>> builders2;
-	std::vector<TilePosition> buildPositions;
+	std::vector<std::pair<Unit*, int>> builders2;
+	std::vector<Unit*> commandCenters;
+	//std::vector<TilePosition> buildPositions;
 public:
 	//Methods inherited from BWAPI:AIModule
 	virtual void onStart();
@@ -52,9 +52,10 @@ public:
 
 	void step1();
 	void step2();
-	void buildBarracks(BWAPI::TilePosition pos);
-	void buildSupplyDepot(BWAPI::TilePosition pos, Unit* worker);
 	void constructBuilding(std::vector<BWAPI::TilePosition> pos, Unit* worker, BWAPI::UnitType building);
-	void trainUnits(int amount);
 	void trainUnits(Unit* trainer, BWAPI::UnitType unit, int amount);
+	bool hasResFor(UnitType type)const;
+	std::vector<Unit*> findWorker(int hireID, BWAPI::UnitType type = BWAPI::UnitTypes::None);
+	std::vector<Unit*> findAndHire(int hireID, BWAPI::UnitType type, int &amount);
+	int findAndChange(int origID, int resultID);
 };
