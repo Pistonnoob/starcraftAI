@@ -91,7 +91,7 @@ std::vector<TilePosition> ExampleAIModule::findBuildingSites(Unit* worker, BWAPI
 {
 	std::vector<TilePosition> returnPositions;
 	
-	TilePosition origin(home->getCenter());
+	TilePosition origin(baseCenter->getRegion()->getCenter());
 	TilePosition providedOrigin = baseCenter->getTilePosition();
 	TilePosition deltaPos = origin;
 
@@ -131,6 +131,25 @@ std::vector<TilePosition> ExampleAIModule::findBuildingSites(Unit* worker, BWAPI
 				}
 			}
 		}
+	}
+	else if(type == BWAPI::UnitTypes::Terran_Refinery)
+	{
+		//Check the map for geysers
+		for(std::set<Unit*>::const_iterator geyser=Broodwar->getGeysers().begin(); geyser != Broodwar->getGeysers().end(); geyser++)
+		{
+			//Check if in same region as passed Command Center
+			if((*geyser)->getRegion() == baseCenter->getRegion())
+			{
+				TilePosition geyserPos = (*geyser)->getTilePosition();
+				//If AI can build refinery there, push the TilePosition to the returning list
+				if(Broodwar->canBuildHere(worker, (*geyser)->getTilePosition(), BWAPI::UnitTypes::Terran_Refinery, false))
+					returnPositions.push_back(geyserPos);
+			}
+		}
+	}
+	else if(type == BWAPI::UnitTypes::Terran_Factory)
+	{
+		
 	}
 	return returnPositions;
 }
@@ -249,6 +268,12 @@ void ExampleAIModule::step2()
 	//Built academy
 	int academyCnt = Broodwar->self()->completedUnitCount(UnitTypes::Terran_Academy) + Broodwar->self()->incompleteUnitCount(UnitTypes::Terran_Academy);
 	int refineryCnt = Broodwar->self()->completedUnitCount(UnitTypes::Terran_Refinery) + Broodwar->self()->incompleteUnitCount(UnitTypes::Terran_Refinery);
+	
+	if(Broodwar->self()->completedUnitCount(UnitTypes::Terran_Academy) == 1)
+	{
+		obj = 1;
+	}
+	
 	/*for(std::set<Unit*>::const_iterator i = Broodwar->self()->getUnits().begin(); i != Broodwar->self()->getUnits().end(); i++)
 	{
 		if((*i)->getType() == UnitTypes::Terran_Academy)
@@ -266,6 +291,7 @@ void ExampleAIModule::step2()
 			if(this->hasResFor(UnitTypes::Terran_Academy))
 			{
 				std::vector<Unit*> hiredWorkers = this->findWorker(21, UnitTypes::Terran_SCV);
+				if(hiredWorkers.empty())
 				if(!hiredWorkers.empty())
 					this->constructBuilding(this->findBuildingSites(hiredWorkers[0], UnitTypes::Terran_Academy, 3, this->commandCenters[0]), hiredWorkers[0], UnitTypes::Terran_Academy);
 			}
@@ -469,7 +495,17 @@ std::vector<Unit*> ExampleAIModule::findWorker(int hireID, BWAPI::UnitType type)
 	return result;
 }
 
-std::vector<Unit*> ExampleAIModule::findAndHire(int hireID, BWAPI::UnitType type, int &amount)
+bool ExampleAIModule::findAndHire(int hireID, BWAPI::UnitType type, int amount, std::vector<Unit*> &storeIn)//Returns false if empty
+{
+	bool result = false;
+	std::vector<Unit*> unitList = this->findAndHire(hireID, type, amount);
+	result = !unitList.empty();
+	if(result)	//If the list was empty, skip adding it to the storage list.
+		storeIn.assign(unitList.begin(), unitList.end());
+	return result;
+}
+
+std::vector<Unit*> ExampleAIModule::findAndHire(int hireID, BWAPI::UnitType type, int amount)
 {
 	std::vector<Unit*> result;
 	for(std::vector<std::pair<Unit *, int>>::iterator i = this->builders2.begin(); i != this->builders2.end(); i++)
@@ -478,7 +514,7 @@ std::vector<Unit*> ExampleAIModule::findAndHire(int hireID, BWAPI::UnitType type
 			if(i->first->getType() == type && i->second == 0) //Check available
 			{
 				//Give it the ID-state which will represent it being issued this workload
-				i->second = hireID;		//2 for step2, 1 for objective 1
+				i->second = hireID;		//2X for step2, X1 for objective 1
 				result.push_back(i->first);
 				amount--;
 				if(amount < 1)
@@ -490,18 +526,26 @@ std::vector<Unit*> ExampleAIModule::findAndHire(int hireID, BWAPI::UnitType type
 
 int ExampleAIModule::findAndChange(int origID, int resultID)
 {
+	return this->findAndChange(origID, resultID, BWAPI::UnitTypes::AllUnits);
+	Broodwar->self()->getStartLocation();
+}
+
+int ExampleAIModule::findAndChange(int origID, int resultID, BWAPI::UnitType type)
+{
 	int changeCnt = 0;
 	for(std::vector<std::pair<Unit*, int>>::iterator i = this->builders2.begin(); i != this->builders2.end(); i++)
 	{
-		if(i->second == origID)
+		if(i->first->getType() == type)
 		{
-			i->second = resultID;
-			changeCnt++;
+			if(i->second == origID)
+			{
+				i->second = resultID;
+				changeCnt++;
+			}
 		}
 	}
 	return changeCnt;
 }
-
 
 bool ExampleAIModule::commandGroup(std::vector<Unit*> units, BWAPI::UnitCommand command)
 {
@@ -511,9 +555,12 @@ bool ExampleAIModule::commandGroup(std::vector<Unit*> units, BWAPI::UnitCommand 
 	{
 		for(std::vector<Unit*>::iterator unit = units.begin(); unit != units.end(); unit++)
 		{
-			if(!(*unit)->issueCommand(command))
+			if((*unit)->canIssueCommand(command))
 			{
-				couldCommand = false;
+				if(!(*unit)->issueCommand(command))
+				{
+					couldCommand = false;
+				}
 			}
 		}
 	}else

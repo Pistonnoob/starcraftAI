@@ -57,8 +57,10 @@ public:
 	void trainUnits(Unit* trainer, BWAPI::UnitType unit, int amount);
 	bool hasResFor(UnitType type)const;
 	std::vector<Unit*> findWorker(int hireID, BWAPI::UnitType type = BWAPI::UnitTypes::Terran_SCV);
-	std::vector<Unit*> findAndHire(int hireID, BWAPI::UnitType type, int &amount);
+	bool findAndHire(int hireID, BWAPI::UnitType type, int amount, std::vector<Unit*> &storeIn);
+	std::vector<Unit*> findAndHire(int hireID, BWAPI::UnitType type, int amount);
 	int findAndChange(int origID, int resultID);
-
+	int findAndChange(int origID, int resultID, BWAPI::UnitType type);
+	
 	bool commandGroup(std::vector<Unit*> units, BWAPI::UnitCommand command);
 };
