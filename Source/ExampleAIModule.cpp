@@ -378,26 +378,30 @@ void ExampleAIModule::constructBuilding(std::vector<BWAPI::TilePosition> possiti
 //shall be called.
 void ExampleAIModule::onFrame()
 {
-	//Call every 2:th frame
-	//if (Broodwar->getFrameCount() % 2 == 0)
-	//{
-	//	this->builders.clear();
-	//	for(std::set<Unit*>::const_iterator i=Broodwar->self()->getUnits().begin();i!=Broodwar->self()->getUnits().end();i++)
-	//	{
-	//		//Check if worker, maybe also if the AI's assigned workers
-	//		if ((*i)->getType().isWorker())
-	//		{
-	//			this->builders.insert((*i));
-	//			/*if((*i)->isCarryingMinerals() || (*i)->isCarryingGas())
-	//			{	
-	//				if(this->builders.find(i) != this->builders.end())
-	//				{
-	//					this->builders.erase(this->builders.find(i));
-	//				}
-	//			}*/
-	//		}
-	//	}
-	//}
+	//Check every second frame
+	if(Broodwar->getFrameCount() % 2 == 0)
+	{
+		//Check if there has been any units created
+		if(!this->newlyCreatedUnits.empty())
+		{
+			//For every unit, check if it has been finished yet. If so then add it to the responding lists
+			for(std::set<Unit*>::iterator unit = this->newlyCreatedUnits.begin(); unit != this->newlyCreatedUnits.end(); unit++)
+			{
+				if((*unit)->isCompleted())
+				{
+					//Add to lists according to type
+					if((*unit)->getType().isWorker())
+					{			
+						this->builders.insert((*unit));
+						this->builders2.push_back(std::pair<Unit*, int>((*unit), 0));	//Start it off with a HiredID of 0. May change in the future.
+					}
+					//Remove it from this list
+					this->newlyCreatedUnits.erase(unit);
+				}
+			}
+		}
+	}
+	
 	//Call every 100:th frame
 	if (Broodwar->getFrameCount() % 100 == 0)
 	{
@@ -501,7 +505,21 @@ int ExampleAIModule::findAndChange(int origID, int resultID)
 
 bool ExampleAIModule::commandGroup(std::vector<Unit*> units, BWAPI::UnitCommand command)
 {
+	bool couldCommand = true;
+	//Check so that the vector actually has elements
+	if(!units.empty())
+	{
+		for(std::vector<Unit*>::iterator unit = units.begin(); unit != units.end(); unit++)
+		{
+			if(!(*unit)->issueCommand(command))
+			{
+				couldCommand = false;
+			}
+		}
+	}else
+		couldCommand = false;
 
+	return couldCommand;
 }
 
 
@@ -608,6 +626,8 @@ void ExampleAIModule::onUnitCreate(BWAPI::Unit* unit)
 	if (unit->getPlayer() == Broodwar->self())
 	{
 		Broodwar->sendText("A %s [%x] has been created at (%d,%d)",unit->getType().getName().c_str(),unit,unit->getPosition().x(),unit->getPosition().y());
+		//Add it to our list of newlyCreatedUnits
+		this->newlyCreatedUnits.insert(unit);
 	}
 }
 
@@ -617,7 +637,18 @@ void ExampleAIModule::onUnitDestroy(BWAPI::Unit* unit)
 	if (unit->getPlayer() == Broodwar->self())
 	{
 		Broodwar->sendText("My unit %s [%x] has been destroyed at (%d,%d)",unit->getType().getName().c_str(),unit,unit->getPosition().x(),unit->getPosition().y());
-		
+		//Remove the unit from the builders list
+		this->builders.erase(this->builders.find(unit));
+		//Remove the unit from the hired builders list
+		for(std::vector<std::pair<Unit*, int>>::iterator i = this->builders2.begin(); i != this->builders2.end(); i++)
+		{
+			if((*i).first == unit)
+			{
+				this->builders2.erase(i);
+				break;
+			}
+		}
+
 	}
 	else
 	{

@@ -20,6 +20,7 @@ private:
 	std::set<Unit*> builders;
 	std::vector<std::pair<Unit*, int>> builders2;
 	std::vector<Unit*> commandCenters;
+	std::set<Unit*> newlyCreatedUnits;
 	//std::vector<TilePosition> buildPositions;
 public:
 	//Methods inherited from BWAPI:AIModule
