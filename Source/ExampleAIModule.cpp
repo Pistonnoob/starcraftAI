@@ -90,10 +90,13 @@ Position ExampleAIModule::findGuardPoint()
 std::vector<TilePosition> ExampleAIModule::findBuildingSites(Unit* worker, BWAPI::UnitType type, int amount, Unit* baseCenter)
 {
 	std::vector<TilePosition> returnPositions;
-	
-	TilePosition origin(baseCenter->getRegion()->getCenter());
+	TilePosition origin(home->getCenter());
+	TilePosition origin2(baseCenter->getRegion()->getCenter());
 	TilePosition providedOrigin = baseCenter->getTilePosition();
 	TilePosition deltaPos = origin;
+	
+	Broodwar->printf("Origin: (%d, %d). CommandOrigin: (%d, %d).", origin.x(), origin.y(), origin2.x(), origin2.y());
+	
 
 	//if(baseCenter->getType() == BWAPI::UnitTypes::Terran_Command_Center)
 	//{
@@ -282,7 +285,7 @@ void ExampleAIModule::step2()
 		}
 	}*/
 #pragma endregion checks objective
-	
+	Broodwar->printf("Completing objective %d!", obj);
 	switch(obj)
 	{
 	case 0:		//construct an academy. (x,y) = (3, 2)
@@ -292,17 +295,23 @@ void ExampleAIModule::step2()
 			{
 				std::vector<Unit*> hiredWorkers = this->findWorker(21, UnitTypes::Terran_SCV);
 				if(hiredWorkers.empty())
+					hiredWorkers = this->findAndHire(21, UnitTypes::Terran_SCV, 1);
 				if(!hiredWorkers.empty())
 					this->constructBuilding(this->findBuildingSites(hiredWorkers[0], UnitTypes::Terran_Academy, 3, this->commandCenters[0]), hiredWorkers[0], UnitTypes::Terran_Academy);
 			}
 		}
 		break;
 	case 1:		//Construct a Refinery
-		if(this->hasResFor(UnitTypes::Terran_Refinery))
+		if(refineryCnt < 1)
 		{
-			std::vector<Unit*> hiredWorkers = this->findWorker(21, UnitTypes::Terran_SCV);	//Use the same HireID as objective 1 did
-			if(!hiredWorkers.empty())
-				this->constructBuilding(this->findBuildingSites(hiredWorkers[0], UnitTypes::Terran_Refinery, 1, this->commandCenters[0]), hiredWorkers[0], UnitTypes::Terran_Refinery);
+			if(this->hasResFor(UnitTypes::Terran_Refinery))
+			{
+				std::vector<Unit*> hiredWorkers = this->findWorker(21, UnitTypes::Terran_SCV);
+				if(hiredWorkers.empty())
+					hiredWorkers = this->findAndHire(21, UnitTypes::Terran_SCV, 1);
+				if(!hiredWorkers.empty())
+					this->constructBuilding(this->findBuildingSites(hiredWorkers[0], UnitTypes::Terran_Refinery, 1, this->commandCenters[0]), hiredWorkers[0], UnitTypes::Terran_Refinery);
+			}
 		}
 		break;
 	case 2:		//Give orders to gather gas and minerals
@@ -334,7 +343,7 @@ void ExampleAIModule::trainUnits(Unit* trainer, BWAPI::UnitType unit, int amount
 				{
 					if(!trainer->train(unit))
 					{
-						Broodwar->printf("Trainer failed to train provided unit-type.");
+						Broodwar->printf("%s failed to train %s.",trainer->getType().getName().c_str(), unit.getName().c_str());
 						canTrain = false;
 					}
 				}else
@@ -376,24 +385,25 @@ void ExampleAIModule::constructBuilding(std::vector<BWAPI::TilePosition> possiti
 									break;
 								}else if(!canBuild && !Broodwar->canBuildHere(worker, pos, building, true))
 								{
+									
 									worker->move(Position(pos), false);
-									Broodwar->printf("Moving worker to build area!");
+									Broodwar->printf("Moving %s to build area! TilePosition: (%d, %d)", worker->getType().getName().c_str(), pos.x(), pos.y());
 									break;
 								}else
 								{
 									Broodwar->printf("%s could not build %s!",worker->getType().getName().c_str(), building.getName().c_str());
 								}
 							}else
-								Broodwar->printf("Worker cannot reach designated tile position!");
+								Broodwar->printf("%s cannot reach designated tile position!", worker->getType().getName().c_str());
 						}else
-							Broodwar->printf("Building cannot be built at designated position!");
+							Broodwar->printf("%s cannot be built at designated position!", building.getName().c_str());
 					}else
-						Broodwar->printf("Not enough materials to begin construction of!");
+						Broodwar->printf("Not enough materials to begin construction of %s!", building.getName().c_str());
 				}
 			}else
-				Broodwar->printf("Designated building is not of type: Building!");
+				Broodwar->printf("Designated %s is not of type: %s!", building.getName().c_str(), UnitTypes::Buildings.getName().c_str());
 		}else
-			Broodwar->printf("Designated worker is not of type: Worker!");
+			Broodwar->printf("Designated %s is not of type: Worker!", worker->getType().getName().c_str());
 	}else
 		Broodwar->printf("Did not designate a possition!");
 }
@@ -472,7 +482,7 @@ bool ExampleAIModule::hasResFor(UnitType type)const
 	bool result = true;
 	if(Broodwar->self()->minerals() < type.mineralPrice() || Broodwar->self()->gas() < type.gasPrice())
 	{
-		if(type.supplyProvided() < 0)
+		if(type.supplyProvided() < 1)
 		{
 			if(type.supplyRequired() < Broodwar->self()->supplyTotal() - Broodwar->self()->supplyUsed())
 				result = false;
