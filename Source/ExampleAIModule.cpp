@@ -114,7 +114,7 @@ std::vector<TilePosition> ExampleAIModule::findBuildingSites(Unit* worker, BWAPI
 		//Build at center of region.
 		returnPositions.push_back(origin);
 	}
-	else if(type == BWAPI::UnitTypes::Terran_Supply_Depot)
+	else if(type == BWAPI::UnitTypes::Terran_Supply_Depot || type == BWAPI::UnitTypes::Terran_Academy)
 	{
 		int foundPos = 0;
 		int xLimit = 4, yLimit = 3;
@@ -156,7 +156,7 @@ void ExampleAIModule::step1()
 	}
 	if(barrackPtr != NULL && barrackPtr->getRallyPosition() == guardPnt)
 		obj = 3;
-	if(marineCnt >= 10 && Broodwar->self()->completedUnitCount(UnitTypes::Terran_Academy) == 2)
+	if(marineCnt >= 10 && Broodwar->self()->completedUnitCount(UnitTypes::Terran_Supply_Depot) == 2)
 		obj = 4;
 	//Logic for completion of each objective within this step
 	switch(obj)
@@ -244,13 +244,11 @@ void ExampleAIModule::step2()
 {	
 
 	int obj = 0;
-
-	Unit* hiredWorker = NULL;
-
-
+	
 #pragma region
 	//Built academy
 	int academyCnt = Broodwar->self()->completedUnitCount(UnitTypes::Terran_Academy) + Broodwar->self()->incompleteUnitCount(UnitTypes::Terran_Academy);
+	int refineryCnt = Broodwar->self()->completedUnitCount(UnitTypes::Terran_Refinery) + Broodwar->self()->incompleteUnitCount(UnitTypes::Terran_Refinery);
 	/*for(std::set<Unit*>::const_iterator i = Broodwar->self()->getUnits().begin(); i != Broodwar->self()->getUnits().end(); i++)
 	{
 		if((*i)->getType() == UnitTypes::Terran_Academy)
@@ -260,21 +258,28 @@ void ExampleAIModule::step2()
 	}*/
 #pragma endregion checks objective
 	
-	Broodwar->printf("Entering step %d", 2);
-
 	switch(obj)
 	{
 	case 0:		//construct an academy. (x,y) = (3, 2)
 		if(academyCnt < 1)
 		{
-			this->constructBuilding(this->findBuildingSites(hiredWorker, UnitTypes::Terran_Academy, 3, this->commandCenters[0]), hiredWorker, UnitTypes::Terran_Academy);
+			if(this->hasResFor(UnitTypes::Terran_Academy))
+			{
+				std::vector<Unit*> hiredWorkers = this->findWorker(21, UnitTypes::Terran_SCV);
+				if(!hiredWorkers.empty())
+					this->constructBuilding(this->findBuildingSites(hiredWorkers[0], UnitTypes::Terran_Academy, 3, this->commandCenters[0]), hiredWorkers[0], UnitTypes::Terran_Academy);
+			}
 		}
-		else
-			obj = 1;
 		break;
 	case 1:		//Construct a Refinery
+		if(this->hasResFor(UnitTypes::Terran_Refinery))
+		{
+			std::vector<Unit*> hiredWorkers = this->findWorker(21, UnitTypes::Terran_SCV);	//Use the same HireID as objective 1 did
+			if(!hiredWorkers.empty())
+				this->constructBuilding(this->findBuildingSites(hiredWorkers[0], UnitTypes::Terran_Refinery, 1, this->commandCenters[0]), hiredWorkers[0], UnitTypes::Terran_Refinery);
+		}
 		break;
-	case 2:
+	case 2:		//Give orders to gather gas and minerals
 		break;
 	case 3:
 		break;
@@ -288,7 +293,7 @@ void ExampleAIModule::step2()
 
 void ExampleAIModule::trainUnits(Unit* trainer, BWAPI::UnitType unit, int amount)
 {
-	bool canBuild = true;
+	bool canTrain = true;
 	//Check if trainer is capable of producing any unit
 	if(trainer->getType().canProduce())
 	{
@@ -297,17 +302,17 @@ void ExampleAIModule::trainUnits(Unit* trainer, BWAPI::UnitType unit, int amount
 		if(builder.first == trainer->getType())
 		{
 			//If so, add a order to the training queue equal to the amount specified
-			for(int a = 0; a < amount && canBuild; a++)
+			for(int a = 0; a < amount && canTrain; a++)
 			{
 				if(this->hasResFor(unit))
 				{
 					if(!trainer->train(unit))
 					{
 						Broodwar->printf("Trainer failed to train provided unit-type.");
-						canBuild = false;
+						canTrain = false;
 					}
 				}else
-					canBuild = false;
+					canTrain = false;
 			}
 		}	
 	}
@@ -401,7 +406,7 @@ void ExampleAIModule::onFrame()
 		{
 			if(!this->steps[i])
 			{
-				Broodwar->printf("Entering steps");
+				Broodwar->printf("Entering step %d", i);
 				switch(i)
 				{
 					case 0:
@@ -494,6 +499,10 @@ int ExampleAIModule::findAndChange(int origID, int resultID)
 }
 
 
+bool ExampleAIModule::commandGroup(std::vector<Unit*> units, BWAPI::UnitCommand command)
+{
+
+}
 
 
 

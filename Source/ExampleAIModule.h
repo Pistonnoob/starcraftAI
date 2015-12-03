@@ -55,7 +55,9 @@ public:
 	void constructBuilding(std::vector<BWAPI::TilePosition> pos, Unit* worker, BWAPI::UnitType building);
 	void trainUnits(Unit* trainer, BWAPI::UnitType unit, int amount);
 	bool hasResFor(UnitType type)const;
-	std::vector<Unit*> findWorker(int hireID, BWAPI::UnitType type = BWAPI::UnitTypes::None);
+	std::vector<Unit*> findWorker(int hireID, BWAPI::UnitType type = BWAPI::UnitTypes::Terran_SCV);
 	std::vector<Unit*> findAndHire(int hireID, BWAPI::UnitType type, int &amount);
 	int findAndChange(int origID, int resultID);
+
+	bool commandGroup(std::vector<Unit*> units, BWAPI::UnitCommand command);
 };
