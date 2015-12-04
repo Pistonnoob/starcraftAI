@@ -63,4 +63,6 @@ public:
 	int findAndChange(int origID, int resultID, BWAPI::UnitType type);
 	
 	bool commandGroup(std::vector<Unit*> units, BWAPI::UnitCommand command);
+	Unit* getClosestUnit(Unit* mine, BWAPI::UnitType targetType);
+	Unit* getClosestUnit(Unit* mine, BWAPI::UnitType targetType, int radius);
 };

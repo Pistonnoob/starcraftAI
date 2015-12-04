@@ -91,11 +91,9 @@ std::vector<TilePosition> ExampleAIModule::findBuildingSites(Unit* worker, BWAPI
 {
 	std::vector<TilePosition> returnPositions;
 	TilePosition origin(home->getCenter());
-	TilePosition origin2(baseCenter->getRegion()->getCenter());
+	//TilePosition origin2(baseCenter->getRegion()->getCenter());
 	TilePosition providedOrigin = baseCenter->getTilePosition();
 	TilePosition deltaPos = origin;
-	
-	Broodwar->printf("Origin: (%d, %d). CommandOrigin: (%d, %d).", origin.x(), origin.y(), origin2.x(), origin2.y());
 	
 
 	//if(baseCenter->getType() == BWAPI::UnitTypes::Terran_Command_Center)
@@ -141,7 +139,8 @@ std::vector<TilePosition> ExampleAIModule::findBuildingSites(Unit* worker, BWAPI
 		for(std::set<Unit*>::const_iterator geyser=Broodwar->getGeysers().begin(); geyser != Broodwar->getGeysers().end(); geyser++)
 		{
 			//Check if in same region as passed Command Center
-			if((*geyser)->getRegion() == baseCenter->getRegion())
+			Broodwar->printf("Geyser region %s. Base region %s", (*geyser)->getRegion()->getID(), baseCenter->getRegion()->getID());
+			if((*geyser)->getRegion()->getID() == baseCenter->getRegion()->getID())
 			{
 				TilePosition geyserPos = (*geyser)->getTilePosition();
 				//If AI can build refinery there, push the TilePosition to the returning list
@@ -265,18 +264,23 @@ void ExampleAIModule::step1()
 void ExampleAIModule::step2()
 {	
 
-	int obj = 0;
 	
 #pragma region
 	//Built academy
 	int academyCnt = Broodwar->self()->completedUnitCount(UnitTypes::Terran_Academy) + Broodwar->self()->incompleteUnitCount(UnitTypes::Terran_Academy);
 	int refineryCnt = Broodwar->self()->completedUnitCount(UnitTypes::Terran_Refinery) + Broodwar->self()->incompleteUnitCount(UnitTypes::Terran_Refinery);
 	
+	int obj = 0;	//Build academy
+
 	if(Broodwar->self()->completedUnitCount(UnitTypes::Terran_Academy) == 1)
 	{
-		obj = 1;
+		obj = 1;	//Build refinery
+
 	}
-	
+	if(Broodwar->self()->completedUnitCount(UnitTypes::Terran_Refinery) >= 1)
+	{
+		obj = 2;	//Finished building, tell hired worker to gather gas and start building 5 more Terran_SCVs and 3 medics
+	}
 	/*for(std::set<Unit*>::const_iterator i = Broodwar->self()->getUnits().begin(); i != Broodwar->self()->getUnits().end(); i++)
 	{
 		if((*i)->getType() == UnitTypes::Terran_Academy)
@@ -308,13 +312,13 @@ void ExampleAIModule::step2()
 			{
 				std::vector<Unit*> hiredWorkers = this->findWorker(21, UnitTypes::Terran_SCV);
 				if(hiredWorkers.empty())
-					hiredWorkers = this->findAndHire(21, UnitTypes::Terran_SCV, 1);
-				if(!hiredWorkers.empty())
-					this->constructBuilding(this->findBuildingSites(hiredWorkers[0], UnitTypes::Terran_Refinery, 1, this->commandCenters[0]), hiredWorkers[0], UnitTypes::Terran_Refinery);
+					hiredWorkers = this->findAndHire(21, UnitTypes::Terran_SCV, 1);					//Breaks here
+				//if(!hiredWorkers.empty())
+					//this->constructBuilding(this->findBuildingSites(hiredWorkers[0], UnitTypes::Terran_Refinery, 1, this->commandCenters[0]), hiredWorkers[0], UnitTypes::Terran_Refinery);
 			}
 		}
 		break;
-	case 2:		//Give orders to gather gas and minerals
+	case 2:		//Fire the hired worker and order it to gather gas. 
 		break;
 	case 3:
 		break;
@@ -364,7 +368,8 @@ void ExampleAIModule::constructBuilding(std::vector<BWAPI::TilePosition> possiti
 			//Check if building is a building
 			if(building.isBuilding())
 			{
-				for(std::vector<TilePosition>::const_iterator posItr = possitions.begin(); posItr != possitions.end(); posItr++)
+				bool success = false;
+				for(std::vector<TilePosition>::const_iterator posItr = possitions.begin(); posItr != possitions.end() && !success; posItr++)
 				{
 					TilePosition pos = (*posItr);
 					if(this->hasResFor(building))
@@ -382,13 +387,13 @@ void ExampleAIModule::constructBuilding(std::vector<BWAPI::TilePosition> possiti
 								if(canBuild)
 								{
 									Broodwar->printf("Constructing %s", building.getName().c_str());
-									break;
-								}else if(!canBuild && !Broodwar->canBuildHere(worker, pos, building, true))
+									success = true;
+								}else if(!canBuild && !Broodwar->canBuildHere(worker, pos, building, true))	//If the reason is that the area is not explored
 								{
-									
+									//Move to the unexplored area
 									worker->move(Position(pos), false);
 									Broodwar->printf("Moving %s to build area! TilePosition: (%d, %d)", worker->getType().getName().c_str(), pos.x(), pos.y());
-									break;
+									success = true;
 								}else
 								{
 									Broodwar->printf("%s could not build %s!",worker->getType().getName().c_str(), building.getName().c_str());
@@ -479,14 +484,13 @@ void ExampleAIModule::onFrame()
 
 bool ExampleAIModule::hasResFor(UnitType type)const
 {
-	bool result = true;
-	if(Broodwar->self()->minerals() < type.mineralPrice() || Broodwar->self()->gas() < type.gasPrice())
+	bool result = false;
+	if(type.mineralPrice() <= Broodwar->self()->minerals() && type.gasPrice() <= Broodwar->self()->gas())
 	{
-		if(type.supplyProvided() < 1)
-		{
-			if(type.supplyRequired() < Broodwar->self()->supplyTotal() - Broodwar->self()->supplyUsed())
-				result = false;
-		}
+		if(type.supplyRequired() <= Broodwar->self()->supplyTotal() - Broodwar->self()->supplyUsed())
+			result = true;
+		else if(type.isBuilding())
+			result = true;
 	}
 	return result;
 }
@@ -494,7 +498,7 @@ bool ExampleAIModule::hasResFor(UnitType type)const
 std::vector<Unit*> ExampleAIModule::findWorker(int hireID, BWAPI::UnitType type)
 {
 	std::vector<Unit*> result;
-	for(std::vector<std::pair<Unit *, int>>::const_iterator i = this->builders2.begin(); i != this->builders2.end(); i++)
+	for(std::vector<std::pair<Unit *, int>>::iterator i = this->builders2.begin(); i != this->builders2.end(); i++)
 	{
 		if(i->first->getType() == type && i->second == hireID)
 		{
@@ -557,9 +561,9 @@ int ExampleAIModule::findAndChange(int origID, int resultID, BWAPI::UnitType typ
 	return changeCnt;
 }
 
-bool ExampleAIModule::commandGroup(std::vector<Unit*> units, BWAPI::UnitCommand command)
+bool ExampleAIModule::commandGroup(std::vector<Unit*> units, BWAPI::UnitCommand command) //returns true if all units could issue the command
 {
-	bool couldCommand = true;
+	bool couldCommandAll = true;
 	//Check so that the vector actually has elements
 	if(!units.empty())
 	{
@@ -569,17 +573,45 @@ bool ExampleAIModule::commandGroup(std::vector<Unit*> units, BWAPI::UnitCommand 
 			{
 				if(!(*unit)->issueCommand(command))
 				{
-					couldCommand = false;
+					couldCommandAll = false;
 				}
 			}
 		}
 	}else
-		couldCommand = false;
+		couldCommandAll = false;
 
-	return couldCommand;
+	return couldCommandAll;
 }
 
+Unit* ExampleAIModule::getClosestUnit(Unit* mine, BWAPI::UnitType targetType)	//Will return units in "mine"s sight range
+{
+	Unit* closest = NULL;
+	
+	closest = this->getClosestUnit(mine, targetType, mine->getType().sightRange());
 
+	return closest;
+}
+
+Unit* ExampleAIModule::getClosestUnit(Unit* mine, BWAPI::UnitType targetType, int radius)	//Will return the closest unit of right type within radius
+{
+	//Get the set of units within given radius of the unit, itterate through them and select the one closest
+	Unit* closest = NULL;
+	std::set<Unit*> unitsInRange = mine->getUnitsInRadius(radius);
+	int distance = radius;
+	for(std::set<Unit*>::const_iterator targetUnit = unitsInRange.begin(); targetUnit != unitsInRange.end(); targetUnit++)
+	{
+		//Check corrected type
+		if((*targetUnit)->getType() == targetType)
+		{	//Check distance
+			if(mine->getDistance((*targetUnit)) <= distance)
+			{
+				distance = mine->getDistance((*targetUnit));
+				closest = (*targetUnit);
+			}
+		}
+	}
+	return closest;
+}
 
 
 
