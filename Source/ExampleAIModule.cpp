@@ -275,7 +275,6 @@ void ExampleAIModule::step2()
 	if(Broodwar->self()->completedUnitCount(UnitTypes::Terran_Academy) == 1)
 	{
 		obj = 1;	//Build refinery
-
 	}
 	if(Broodwar->self()->completedUnitCount(UnitTypes::Terran_Refinery) >= 1)
 	{
@@ -312,9 +311,11 @@ void ExampleAIModule::step2()
 			{
 				std::vector<Unit*> hiredWorkers = this->findWorker(21, UnitTypes::Terran_SCV);
 				if(hiredWorkers.empty())
-					hiredWorkers = this->findAndHire(21, UnitTypes::Terran_SCV, 1);					//Breaks here
+					hiredWorkers = this->findAndHire(21, UnitTypes::Terran_SCV, 1);					
 				if(!hiredWorkers.empty())
+				{
 					this->constructBuilding(this->findBuildingSites(hiredWorkers[0], UnitTypes::Terran_Refinery, 1, this->commandCenters[0]), hiredWorkers[0], UnitTypes::Terran_Refinery);
+				}
 			}
 		}
 		break;
