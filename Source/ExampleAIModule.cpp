@@ -313,8 +313,8 @@ void ExampleAIModule::step2()
 				std::vector<Unit*> hiredWorkers = this->findWorker(21, UnitTypes::Terran_SCV);
 				if(hiredWorkers.empty())
 					hiredWorkers = this->findAndHire(21, UnitTypes::Terran_SCV, 1);					//Breaks here
-				//if(!hiredWorkers.empty())
-					//this->constructBuilding(this->findBuildingSites(hiredWorkers[0], UnitTypes::Terran_Refinery, 1, this->commandCenters[0]), hiredWorkers[0], UnitTypes::Terran_Refinery);
+				if(!hiredWorkers.empty())
+					this->constructBuilding(this->findBuildingSites(hiredWorkers[0], UnitTypes::Terran_Refinery, 1, this->commandCenters[0]), hiredWorkers[0], UnitTypes::Terran_Refinery);
 			}
 		}
 		break;
@@ -522,17 +522,19 @@ bool ExampleAIModule::findAndHire(int hireID, BWAPI::UnitType type, int amount, 
 std::vector<Unit*> ExampleAIModule::findAndHire(int hireID, BWAPI::UnitType type, int amount)
 {
 	std::vector<Unit*> result;
-	for(std::vector<std::pair<Unit *, int>>::iterator i = this->builders2.begin(); i != this->builders2.end(); i++)
+	int hireCnt = 0;
+	for(std::vector<std::pair<Unit *, int>>::iterator i = this->builders2.begin(); i != this->builders2.end() && hireCnt < amount; i++)
 		{
 			//We are now accessing the pair structure with the builders and their assigned states. Hire a builder and set their ID-state
-			if(i->first->getType() == type && i->second == 0) //Check available
+			if(i->first->getType() == type) //Check type
 			{
-				//Give it the ID-state which will represent it being issued this workload
-				i->second = hireID;		//2X for step2, X1 for objective 1
-				result.push_back(i->first);
-				amount--;
-				if(amount < 1)
-					break;
+				if(i->second == 0 || i->second == hireID)	//Check available
+				{
+					//Give it the ID-state which will represent it being issued this workload
+					i->second = hireID;		//2X for step2, X1 for objective 1
+					result.push_back(i->first);
+					hireCnt++;
+				}
 			}
 		}
 	return result;
@@ -541,7 +543,6 @@ std::vector<Unit*> ExampleAIModule::findAndHire(int hireID, BWAPI::UnitType type
 int ExampleAIModule::findAndChange(int origID, int resultID)
 {
 	return this->findAndChange(origID, resultID, BWAPI::UnitTypes::AllUnits);
-	Broodwar->self()->getStartLocation();
 }
 
 int ExampleAIModule::findAndChange(int origID, int resultID, BWAPI::UnitType type)
@@ -585,11 +586,7 @@ bool ExampleAIModule::commandGroup(std::vector<Unit*> units, BWAPI::UnitCommand 
 
 Unit* ExampleAIModule::getClosestUnit(Unit* mine, BWAPI::UnitType targetType)	//Will return units in "mine"s sight range
 {
-	Unit* closest = NULL;
-	
-	closest = this->getClosestUnit(mine, targetType, mine->getType().sightRange());
-
-	return closest;
+	return this->getClosestUnit(mine, targetType, mine->getType().sightRange());
 }
 
 Unit* ExampleAIModule::getClosestUnit(Unit* mine, BWAPI::UnitType targetType, int radius)	//Will return the closest unit of right type within radius
