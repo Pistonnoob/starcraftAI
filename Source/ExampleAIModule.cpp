@@ -136,19 +136,40 @@ std::vector<TilePosition> ExampleAIModule::findBuildingSites(Unit* worker, BWAPI
 	else if(type == BWAPI::UnitTypes::Terran_Refinery)
 	{
 		//Check the map for geysers
-		for(std::set<Unit*>::const_iterator geyser=Broodwar->getGeysers().begin(); geyser != Broodwar->getGeysers().end(); geyser++)
-		{
-			//Check if in same region as passed Command Center
-			Broodwar->printf("Geyser region %s. Base region %s", (*geyser)->getRegion()->getID(), baseCenter->getRegion()->getID());
-			if((*geyser)->getRegion()->getID() == baseCenter->getRegion()->getID())
-			{
-				TilePosition geyserPos = (*geyser)->getTilePosition();
-				//If AI can build refinery there, push the TilePosition to the returning list
-				if(Broodwar->canBuildHere(worker, (*geyser)->getTilePosition(), BWAPI::UnitTypes::Terran_Refinery, false))
-					returnPositions.push_back(geyserPos);
-			}
-		}
+		std::pair<Unit*, int> closest(NULL, -1);
+		//for(std::set<Unit*>::iterator geyser=Broodwar->getGeysers().begin(); geyser != Broodwar->getGeysers().end(); geyser++)
+		//{
+
+		//	//Check if in same region as passed Command Center
+		//	Broodwar->printf("Geyser region %s. Base region %s", (*geyser)->getRegion()->getID(), baseCenter->getRegion()->getID());
+		//	//Check distance
+		//	if(closest.first == NULL || baseCenter->getDistance((*geyser)) < closest.second)
+		//	{
+		//		closest.first = (*geyser);
+		//		closest.second = baseCenter->getDistance(closest.first);
+		//	}
+		//	
+		//}
+		//If AI can build refinery there, push the TilePosition to the returning list
+		//if(closest.first != NULL && Broodwar->canBuildHere(worker, closest.first->getTilePosition(), BWAPI::UnitTypes::Terran_Refinery, false))
+			//returnPositions.push_back(closest.first->getTilePosition());
 	}
+	//else if(type == BWAPI::UnitTypes::Terran_Refinery)
+	//{
+	//	//Check the map for geysers
+	//	for(std::set<Unit*>::const_iterator geyser=Broodwar->getGeysers().begin(); geyser != Broodwar->getGeysers().end(); geyser++)
+	//	{
+	//		//Check if in same region as passed Command Center
+	//		Broodwar->printf("Geyser region %s. Base region %s", (*geyser)->getRegion()->getID(), baseCenter->getRegion()->getID());
+	//		if((*geyser)->getRegion()->getID() == baseCenter->getRegion()->getID())
+	//		{
+	//			TilePosition geyserPos = (*geyser)->getTilePosition();
+	//			//If AI can build refinery there, push the TilePosition to the returning list
+	//			if(Broodwar->canBuildHere(worker, (*geyser)->getTilePosition(), BWAPI::UnitTypes::Terran_Refinery, false))
+	//				returnPositions.push_back(geyserPos);
+	//		}
+	//	}
+	//}
 	else if(type == BWAPI::UnitTypes::Terran_Factory)
 	{
 		
@@ -189,7 +210,7 @@ void ExampleAIModule::step1()
 				{
 					if((*i)->getType().isWorker())
 					{
-						this->constructBuilding(this->findBuildingSites(*i, UnitTypes::Terran_Barracks, 1, this->commandCenters[0]), *i, UnitTypes::Terran_Barracks); 
+						this->constructBuilding(this->findBuildingSites(*i, UnitTypes::Terran_Barracks, 1, this->commandCenters.front()), *i, UnitTypes::Terran_Barracks); 
 						//this->buildBarracks(this->findBuildingSites(BWAPI::UnitTypes::Terran_Barracks, 1).front());
 						break;
 					}
@@ -300,7 +321,10 @@ void ExampleAIModule::step2()
 				if(hiredWorkers.empty())
 					hiredWorkers = this->findAndHire(21, UnitTypes::Terran_SCV, 1);
 				if(!hiredWorkers.empty())
-					this->constructBuilding(this->findBuildingSites(hiredWorkers[0], UnitTypes::Terran_Academy, 3, this->commandCenters[0]), hiredWorkers[0], UnitTypes::Terran_Academy);
+				{
+					std::vector<BWAPI::TilePosition> buildingSites = this->findBuildingSites(hiredWorkers[0], UnitTypes::Terran_Academy, 3, this->commandCenters[0]);
+					this->constructBuilding(buildingSites, hiredWorkers[0], UnitTypes::Terran_Academy);
+				}
 			}
 		}
 		break;
@@ -312,9 +336,11 @@ void ExampleAIModule::step2()
 				std::vector<Unit*> hiredWorkers = this->findWorker(21, UnitTypes::Terran_SCV);
 				if(hiredWorkers.empty())
 					hiredWorkers = this->findAndHire(21, UnitTypes::Terran_SCV, 1);					
-				if(!hiredWorkers.empty())
+				if(!hiredWorkers.empty() && !this->commandCenters.empty())
 				{
-					this->constructBuilding(this->findBuildingSites(hiredWorkers[0], UnitTypes::Terran_Refinery, 1, this->commandCenters[0]), hiredWorkers[0], UnitTypes::Terran_Refinery);
+					std::vector<BWAPI::TilePosition> buildingSites = this->findBuildingSites(hiredWorkers[0], UnitTypes::Terran_Refinery, 1, this->commandCenters[0]);
+					//if(!buildingSites.empty())
+						//this->constructBuilding(buildingSites, hiredWorkers[0], UnitTypes::Terran_Refinery);
 				}
 			}
 		}
@@ -358,10 +384,10 @@ void ExampleAIModule::trainUnits(Unit* trainer, BWAPI::UnitType unit, int amount
 	}
 }
 
-void ExampleAIModule::constructBuilding(std::vector<BWAPI::TilePosition> possitions, Unit* worker, BWAPI::UnitType building)
+void ExampleAIModule::constructBuilding(std::vector<BWAPI::TilePosition> positions, Unit* worker, BWAPI::UnitType building)
 {
 	//Check if pos exists
-	if(!possitions.empty() && possitions[0] != TilePosition(0, 0))
+	if(!positions.empty())
 	{
 		//Check if worker is a worker
 		if(worker->getType().isWorker())
@@ -370,7 +396,7 @@ void ExampleAIModule::constructBuilding(std::vector<BWAPI::TilePosition> possiti
 			if(building.isBuilding())
 			{
 				bool success = false;
-				for(std::vector<TilePosition>::const_iterator posItr = possitions.begin(); posItr != possitions.end() && !success; posItr++)
+				for(std::vector<TilePosition>::const_iterator posItr = positions.begin(); posItr != positions.end() && !success; posItr++)
 				{
 					TilePosition pos = (*posItr);
 					if(this->hasResFor(building))
