@@ -297,7 +297,7 @@ void ExampleAIModule::step2()
 	switch(this->actObjective)
 	{
 	case 0:
-		if(Broodwar->self()->completedUnitCount(UnitTypes::Terran_Academy) == 1)
+		if(Broodwar->self()->completedUnitCount(UnitTypes::Terran_Academy) >= 1)
 		{
 			//obj = 1;	//Build refinery
 			this->actObjective = 1;
@@ -373,8 +373,8 @@ void ExampleAIModule::step2()
 				if(!hiredWorkers.empty() && !this->commandCenters.empty())
 				{
 					std::vector<BWAPI::TilePosition> buildingSites = this->findBuildingSites(hiredWorkers[0], UnitTypes::Terran_Refinery, 1, this->commandCenters[0]);
-					//if(!buildingSites.empty())
-						//this->constructBuilding(buildingSites, hiredWorkers[0], UnitTypes::Terran_Refinery);
+					if(!buildingSites.empty())
+						this->constructBuilding(buildingSites, hiredWorkers[0], UnitTypes::Terran_Refinery);
 				}
 			}
 		}
@@ -546,14 +546,19 @@ void ExampleAIModule::onFrame()
 				{
 					//Add to lists according to type
 					if((*unit)->getType().isWorker())
-					{			
+					{
+						//Make the worker gather minerals or gas, depending on need
 						this->builders.insert((*unit));
-						this->builders2.push_back(std::pair<Unit*, int>((*unit), 0));	//Start it off with a HiredID of 0. May change in the future.
+						this->builders2.push_back(std::pair<Unit*, int>((*unit), 1));	//Start it off with a HiredID of 1. May change in the future.
 					}
 					//Remove it from this list
 					this->newlyCreatedUnits.erase(unit);
 				}
 			}
+		}
+		//Check for bored workers
+		for(std::vector<std::pair<Unit*, int>>::iterator unit = this->builders2.begin(); unit != this->builders2.end(); unit++)
+		{
 		}
 	}
 	
@@ -722,6 +727,19 @@ Unit* ExampleAIModule::getClosestUnit(Unit* mine, BWAPI::UnitType targetType, in
 		}
 	}
 	return closest;
+}
+
+Unit* ExampleAIModule::getClosestMineral(Unit* unit)
+{
+	Unit* closestMineral = NULL;
+	for(std::set<Unit*>::iterator m=Broodwar->getMinerals().begin();m!=Broodwar->getMinerals().end();m++)
+	{
+		if (closestMineral==NULL || unit->getDistance(*m)<unit->getDistance(closestMineral))
+		{	
+			closestMineral=*m;
+		}
+	}
+	return closestMineral;
 }
 
 

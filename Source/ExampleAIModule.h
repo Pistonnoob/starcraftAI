@@ -49,14 +49,19 @@ public:
 	void showPlayers();
 	void showForces();
 	Position findGuardPoint();
-
+	
+	//More own methods
 	std::vector<TilePosition> findBuildingSites(Unit* worker, BWAPI::UnitType type, int amount, Unit* commandCenter);
 
 	void step1();
 	void step2();
+	
 	void constructBuilding(std::vector<BWAPI::TilePosition> pos, Unit* worker, BWAPI::UnitType building);
 	void trainUnits(Unit* trainer, BWAPI::UnitType unit, int amount);
 	bool hasResFor(UnitType type)const;
+	
+	
+
 	std::vector<Unit*> findWorker(int hireID, BWAPI::UnitType type = BWAPI::UnitTypes::Terran_SCV);
 	bool findAndHire(int hireID, BWAPI::UnitType type, int amount, std::vector<Unit*> &storeIn);
 	std::vector<Unit*> findAndHire(int hireID, BWAPI::UnitType type, int amount);
@@ -66,4 +71,5 @@ public:
 	bool commandGroup(std::vector<Unit*> units, BWAPI::UnitCommand command);
 	Unit* getClosestUnit(Unit* mine, BWAPI::UnitType targetType);
 	Unit* getClosestUnit(Unit* mine, BWAPI::UnitType targetType, int radius);
+	Unit* getClosestMineral(Unit* unit);
 };
