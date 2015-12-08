@@ -137,22 +137,22 @@ std::vector<TilePosition> ExampleAIModule::findBuildingSites(Unit* worker, BWAPI
 	{
 		//Check the map for geysers
 		std::pair<Unit*, int> closest(NULL, -1);
-		//for(std::set<Unit*>::iterator geyser=Broodwar->getGeysers().begin(); geyser != Broodwar->getGeysers().end(); geyser++)
-		//{
+		for(std::set<Unit*>::iterator geyser=Broodwar->getGeysers().begin(); geyser != Broodwar->getGeysers().end(); geyser++)
+		{
 
-		//	//Check if in same region as passed Command Center
-		//	Broodwar->printf("Geyser region %s. Base region %s", (*geyser)->getRegion()->getID(), baseCenter->getRegion()->getID());
-		//	//Check distance
-		//	if(closest.first == NULL || baseCenter->getDistance((*geyser)) < closest.second)
-		//	{
-		//		closest.first = (*geyser);
-		//		closest.second = baseCenter->getDistance(closest.first);
-		//	}
-		//	
-		//}
+			//Check if in same region as passed Command Center
+			Broodwar->printf("Geyser region %s. Base region %s", (*geyser)->getRegion()->getID(), baseCenter->getRegion()->getID());
+			//Check distance
+			if(closest.first == NULL || baseCenter->getDistance((*geyser)) < closest.second)
+			{
+				closest.first = (*geyser);
+				closest.second = baseCenter->getDistance(closest.first);
+			}
+			
+		}
 		//If AI can build refinery there, push the TilePosition to the returning list
-		//if(closest.first != NULL && Broodwar->canBuildHere(worker, closest.first->getTilePosition(), BWAPI::UnitTypes::Terran_Refinery, false))
-			//returnPositions.push_back(closest.first->getTilePosition());
+		if(closest.first != NULL && Broodwar->canBuildHere(worker, closest.first->getTilePosition(), BWAPI::UnitTypes::Terran_Refinery, false))
+			returnPositions.push_back(closest.first->getTilePosition());
 	}
 	//else if(type == BWAPI::UnitTypes::Terran_Refinery)
 	//{
@@ -204,18 +204,36 @@ void ExampleAIModule::step1()
 	switch(obj)
 	{
 		case 0:
-			if(Broodwar->self()->minerals() >= UnitTypes::Terran_Barracks.mineralPrice())
+			if(Broodwar->self()->completedUnitCount(UnitTypes::Terran_Refinery) + Broodwar->self()->incompleteUnitCount(UnitTypes::Terran_Refinery) < 1)
 			{
-				for(std::set<Unit*>::const_iterator i=this->builders.begin();i!=this->builders.end();i++)
+				if(this->hasResFor(UnitTypes::Terran_Refinery))
 				{
-					if((*i)->getType().isWorker())
+					std::vector<Unit*> hiredWorkers = this->findWorker(21, UnitTypes::Terran_SCV);
+					if(hiredWorkers.empty())
+						hiredWorkers = this->findAndHire(21, UnitTypes::Terran_SCV, 1);					
+					if(!hiredWorkers.empty() && !this->commandCenters.empty())
 					{
-						this->constructBuilding(this->findBuildingSites(*i, UnitTypes::Terran_Barracks, 1, this->commandCenters.front()), *i, UnitTypes::Terran_Barracks); 
-						//this->buildBarracks(this->findBuildingSites(BWAPI::UnitTypes::Terran_Barracks, 1).front());
-						break;
-					}
-				}
+						std::vector<BWAPI::TilePosition> buildingSites = this->findBuildingSites(hiredWorkers[0], UnitTypes::Terran_Refinery, 1, this->commandCenters[0]);
+						//if(!buildingSites.empty())
+							//this->constructBuilding(buildingSites, hiredWorkers[0], UnitTypes::Terran_Refinery);
+					}else
+						Broodwar->printf("Did not find any %s", UnitTypes::Terran_SCV.getName().c_str());
+				}else
+					Broodwar->printf("Does not have resources for %s", UnitTypes::Terran_Refinery.getName().c_str());
 			}
+			//if(Broodwar->self()->minerals() >= UnitTypes::Terran_Barracks.mineralPrice())
+			//if(Broodwar->canMake(NULL, UnitTypes::Terran_Barracks))
+			//{
+			//	for(std::set<Unit*>::const_iterator i=this->builders.begin();i!=this->builders.end();i++)
+			//	{
+			//		if((*i)->getType().isWorker())
+			//		{
+			//			this->constructBuilding(this->findBuildingSites(*i, UnitTypes::Terran_Barracks, 1, this->commandCenters.front()), *i, UnitTypes::Terran_Barracks); 
+			//			//this->buildBarracks(this->findBuildingSites(BWAPI::UnitTypes::Terran_Barracks, 1).front());
+			//			break;
+			//		}
+			//	}
+			//}
 			break;
 		case 1:
 			Broodwar->printf("Barrack being constructed!");
@@ -315,7 +333,8 @@ void ExampleAIModule::step2()
 	case 0:		//construct an academy. (x,y) = (3, 2)
 		if(academyCnt < 1)
 		{
-			if(this->hasResFor(UnitTypes::Terran_Academy))
+			//if(this->hasResFor(UnitTypes::Terran_Academy))
+			if(Broodwar->canMake(NULL, BWAPI::UnitTypes::Terran_Academy))
 			{
 				std::vector<Unit*> hiredWorkers = this->findWorker(21, UnitTypes::Terran_SCV);
 				if(hiredWorkers.empty())
@@ -558,9 +577,9 @@ std::vector<Unit*> ExampleAIModule::findAndHire(int hireID, BWAPI::UnitType type
 				if(i->second == 0 || i->second == hireID)	//Check available
 				{
 					//Give it the ID-state which will represent it being issued this workload
-					i->second = hireID;		//2X for step2, X1 for objective 1
-					result.push_back(i->first);
-					hireCnt++;
+					i->second = hireID;		//2X for step 2, X1 for objective 1
+					result.push_back(i->first);	//Store the unit pointer, may be a better idéa to store the ID.
+					hireCnt++;	//Increase the hired unit counter.
 				}
 			}
 		}
@@ -751,17 +770,19 @@ void ExampleAIModule::onUnitDestroy(BWAPI::Unit* unit)
 	{
 		Broodwar->sendText("My unit %s [%x] has been destroyed at (%d,%d)",unit->getType().getName().c_str(),unit,unit->getPosition().x(),unit->getPosition().y());
 		//Remove the unit from the builders list
-		this->builders.erase(this->builders.find(unit));
-		//Remove the unit from the hired builders list
-		for(std::vector<std::pair<Unit*, int>>::iterator i = this->builders2.begin(); i != this->builders2.end(); i++)
-		{
-			if((*i).first == unit)
+		if(unit->getType() == BWAPI::UnitTypes::Terran_SCV)
+		{	
+			this->builders.erase(this->builders.find(unit));
+			//Remove the unit from the hired builders list
+			for(std::vector<std::pair<Unit*, int>>::iterator i = this->builders2.begin(); i != this->builders2.end(); i++)
 			{
-				this->builders2.erase(i);
-				break;
+				if((*i).first->getID() == unit->getID())
+				{
+					this->builders2.erase(i);
+					break;
+				}
 			}
 		}
-
 	}
 	else
 	{
