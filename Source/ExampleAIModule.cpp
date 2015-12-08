@@ -12,6 +12,7 @@ void ExampleAIModule::onStart()
 {
 	for(int i = 0; i < 5; i++)
 		this->steps[i] = false;
+	this->actObjective = 0;
 	//Enable flags
 	Broodwar->enableFlag(Flag::UserInput);
 	//Uncomment to enable complete map information
@@ -141,7 +142,7 @@ std::vector<TilePosition> ExampleAIModule::findBuildingSites(Unit* worker, BWAPI
 		{
 
 			//Check if in same region as passed Command Center
-			Broodwar->printf("Geyser region %s. Base region %s", (*geyser)->getRegion()->getID(), baseCenter->getRegion()->getID());
+			//Broodwar->printf("Geyser region %d. Base region %d", (*geyser)->getRegion()->getID(), baseCenter->getRegion()->getID());
 			//Check distance
 			if(closest.first == NULL || baseCenter->getDistance((*geyser)) < closest.second)
 			{
@@ -204,36 +205,19 @@ void ExampleAIModule::step1()
 	switch(obj)
 	{
 		case 0:
-			if(Broodwar->self()->completedUnitCount(UnitTypes::Terran_Refinery) + Broodwar->self()->incompleteUnitCount(UnitTypes::Terran_Refinery) < 1)
+			if(Broodwar->self()->minerals() >= UnitTypes::Terran_Barracks.mineralPrice())
+			if(Broodwar->canMake(NULL, UnitTypes::Terran_Barracks))
 			{
-				if(this->hasResFor(UnitTypes::Terran_Refinery))
+				for(std::set<Unit*>::const_iterator i=this->builders.begin();i!=this->builders.end();i++)
 				{
-					std::vector<Unit*> hiredWorkers = this->findWorker(21, UnitTypes::Terran_SCV);
-					if(hiredWorkers.empty())
-						hiredWorkers = this->findAndHire(21, UnitTypes::Terran_SCV, 1);					
-					if(!hiredWorkers.empty() && !this->commandCenters.empty())
+					if((*i)->getType().isWorker())
 					{
-						std::vector<BWAPI::TilePosition> buildingSites = this->findBuildingSites(hiredWorkers[0], UnitTypes::Terran_Refinery, 1, this->commandCenters[0]);
-						//if(!buildingSites.empty())
-							//this->constructBuilding(buildingSites, hiredWorkers[0], UnitTypes::Terran_Refinery);
-					}else
-						Broodwar->printf("Did not find any %s", UnitTypes::Terran_SCV.getName().c_str());
-				}else
-					Broodwar->printf("Does not have resources for %s", UnitTypes::Terran_Refinery.getName().c_str());
+						this->constructBuilding(this->findBuildingSites(*i, UnitTypes::Terran_Barracks, 1, this->commandCenters.front()), *i, UnitTypes::Terran_Barracks); 
+						//this->buildBarracks(this->findBuildingSites(BWAPI::UnitTypes::Terran_Barracks, 1).front());
+						break;
+					}
+				}
 			}
-			//if(Broodwar->self()->minerals() >= UnitTypes::Terran_Barracks.mineralPrice())
-			//if(Broodwar->canMake(NULL, UnitTypes::Terran_Barracks))
-			//{
-			//	for(std::set<Unit*>::const_iterator i=this->builders.begin();i!=this->builders.end();i++)
-			//	{
-			//		if((*i)->getType().isWorker())
-			//		{
-			//			this->constructBuilding(this->findBuildingSites(*i, UnitTypes::Terran_Barracks, 1, this->commandCenters.front()), *i, UnitTypes::Terran_Barracks); 
-			//			//this->buildBarracks(this->findBuildingSites(BWAPI::UnitTypes::Terran_Barracks, 1).front());
-			//			break;
-			//		}
-			//	}
-			//}
 			break;
 		case 1:
 			Broodwar->printf("Barrack being constructed!");
@@ -309,16 +293,47 @@ void ExampleAIModule::step2()
 	int academyCnt = Broodwar->self()->completedUnitCount(UnitTypes::Terran_Academy) + Broodwar->self()->incompleteUnitCount(UnitTypes::Terran_Academy);
 	int refineryCnt = Broodwar->self()->completedUnitCount(UnitTypes::Terran_Refinery) + Broodwar->self()->incompleteUnitCount(UnitTypes::Terran_Refinery);
 	
-	int obj = 0;	//Build academy
-
-	if(Broodwar->self()->completedUnitCount(UnitTypes::Terran_Academy) == 1)
+	//int obj = 0;	//Build academy
+	switch(this->actObjective)
 	{
-		obj = 1;	//Build refinery
+	case 0:
+		if(Broodwar->self()->completedUnitCount(UnitTypes::Terran_Academy) == 1)
+		{
+			//obj = 1;	//Build refinery
+			this->actObjective = 1;
+		}
+		break;
+	case 1:
+		if(Broodwar->self()->completedUnitCount(UnitTypes::Terran_Refinery) >= 1)
+		{
+			//obj = 2;	//Finished building, tell hired worker to gather gas and start building 5 more Terran_SCVs and 3 medics
+			this->actObjective = 2;
+		}
+		break;
+	case 2:
+		//Fire the hired worker and order it to gather gas.
+		//Only execute the objective 2 once before changing to objective 3.
+		this->actObjective = 3;
+		break;
+	case 3:
+		if(Broodwar->self()->completedUnitCount(BWAPI::UnitTypes::Terran_Medic) + Broodwar->self()->incompleteUnitCount(BWAPI::UnitTypes::Terran_Medic) >= 3)
+		{
+			int workerCnt = Broodwar->self()->completedUnitCount(BWAPI::UnitTypes::Terran_Medic) + Broodwar->self()->incompleteUnitCount(BWAPI::UnitTypes::Terran_Medic) - 4;	//4 is the initial worker count
+			if(workerCnt >= 5)
+			{
+				this->actObjective = 4;
+			}
+		}
+		break;
+	case 4:
+		//Finished all objectives in step 2. Reset objectiveCnt and check step 2 as True
+		this->actObjective = 0;
+		this->steps[1] = true;
+		break;
+	default:
+		break;
 	}
-	if(Broodwar->self()->completedUnitCount(UnitTypes::Terran_Refinery) >= 1)
-	{
-		obj = 2;	//Finished building, tell hired worker to gather gas and start building 5 more Terran_SCVs and 3 medics
-	}
+	
 	/*for(std::set<Unit*>::const_iterator i = Broodwar->self()->getUnits().begin(); i != Broodwar->self()->getUnits().end(); i++)
 	{
 		if((*i)->getType() == UnitTypes::Terran_Academy)
@@ -327,8 +342,8 @@ void ExampleAIModule::step2()
 		}
 	}*/
 #pragma endregion checks objective
-	Broodwar->printf("Completing objective %d!", obj);
-	switch(obj)
+	Broodwar->printf("Completing objective %d!", this->actObjective);
+	switch(this->actObjective)
 	{
 	case 0:		//construct an academy. (x,y) = (3, 2)
 		if(academyCnt < 1)
@@ -364,11 +379,64 @@ void ExampleAIModule::step2()
 			}
 		}
 		break;
-	case 2:		//Fire the hired worker and order it to gather gas. 
+	case 2:		//Fire the hired worker and order it to gather gas.
+		{
+			std::vector<Unit*> hiredWorkers = this->findWorker(21, UnitTypes::Terran_SCV);
+			if(!hiredWorkers.empty())	//If there is a worker with that hireID.
+			{
+				//Tell it to gather gas and reset its hireID
+				for(std::vector<Unit*>::iterator unit = hiredWorkers.begin(); unit != hiredWorkers.end(); unit++)
+				{
+					//Set it to  gather gas form the refinery
+					for(std::set<Unit*>::const_iterator refinery = Broodwar->self()->getUnits().begin(); refinery != Broodwar->self()->getUnits().end(); refinery++)
+					{
+						if((*refinery)->getType() == BWAPI::UnitTypes::Terran_Refinery)
+						{
+							(*unit)->gather((*refinery), false);
+							break;
+						}
+					}
+				}
+				this->findAndChange(21, 0);
+			}
+		}
 		break;
-	case 3:
+	case 3:	//Create 5 workers and 3 medics
+		{
+			int medicCnt = Broodwar->self()->completedUnitCount(BWAPI::UnitTypes::Terran_Medic) + Broodwar->self()->incompleteUnitCount(BWAPI::UnitTypes::Terran_Medic);
+			int workerCnt = Broodwar->self()->completedUnitCount(BWAPI::UnitTypes::Terran_Medic) + Broodwar->self()->incompleteUnitCount(BWAPI::UnitTypes::Terran_Medic) - 4;	//4 is the initial worker count
+			//Try to create workers before creating medics. To boost the economy
+			if(workerCnt < 5)	//Create workers
+			{
+				if(!this->commandCenters.empty())
+				{
+					if(Broodwar->canMake(this->commandCenters[0], UnitTypes::Terran_SCV))
+					{
+						this->trainUnits(this->commandCenters[0], UnitTypes::Terran_SCV, 5 - workerCnt);
+					}else
+						Broodwar->printf("%s cannot create any %s!", this->commandCenters[0]->getType().getName().c_str(), UnitTypes::Terran_SCV.getName().c_str());
+				}
+			}
+			if(medicCnt < 3)	//Create medics
+			{
+				for(std::set<Unit*>::const_iterator barrack = Broodwar->self()->getUnits().begin(); barrack != Broodwar->self()->getUnits().end(); barrack++)
+				{
+					if((*barrack)->getType() == BWAPI::UnitTypes::Terran_Barracks)
+					{
+						if(Broodwar->canMake(NULL, BWAPI::UnitTypes::Terran_Medic))
+						{
+							//Try to train medics until the AI player has 3. Also send them to chokepoint.
+							this->trainUnits((*barrack), BWAPI::UnitTypes::Terran_Medic, 3 - medicCnt);
+						}
+						break;
+					}
+				}
+			}
+		}
 		break;
-	case 4:
+	case 4:	//In case something happened to the earlier switch case, redo the actions.
+		this->actObjective = 0;
+		this->steps[1] = true;
 		break;
 	default:
 		break; //Not necessary

@@ -17,6 +17,7 @@ class ExampleAIModule : public BWAPI::AIModule
 {
 private:
 	bool steps[5];
+	int actObjective;
 	std::set<Unit*> builders;
 	std::vector<std::pair<Unit*, int>> builders2;
 	std::vector<Unit*> commandCenters;
