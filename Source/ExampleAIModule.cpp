@@ -549,8 +549,9 @@ void ExampleAIModule::onFrame()
 					{
 						//Make the worker gather minerals or gas, depending on need
 						this->builders.insert((*unit));
-						this->builders2.push_back(std::pair<Unit*, int>((*unit), 1));	//Start it off with a HiredID of 1. May change in the future.
+						this->builders2.push_back(std::pair<Unit*, int>((*unit), 0));	//Start it off with a HiredID of 0. May change in the future.
 					}
+					(*unit)->stop();
 					//Remove it from this list
 					this->newlyCreatedUnits.erase(unit);
 				}
@@ -559,6 +560,33 @@ void ExampleAIModule::onFrame()
 		//Check for bored workers
 		for(std::vector<std::pair<Unit*, int>>::iterator unit = this->builders2.begin(); unit != this->builders2.end(); unit++)
 		{
+			if((*unit).second == 0 && (*unit).first->getType() == UnitTypes::Terran_SCV)
+			{
+				if((*unit).first->isIdle())
+				{
+					//Assign workload
+					int mGatherCnt = 0;
+					int gGatherCnt = 0;
+					for(std::vector<std::pair<Unit*, int>>::iterator allUnits = this->builders2.begin(); allUnits != this->builders2.end(); allUnits++)
+					{
+						if(allUnits != unit)
+						{
+							if((*allUnits).first->isGatheringMinerals())
+								mGatherCnt++;
+							else if((*allUnits).first->isGatheringGas())
+								gGatherCnt++;
+						}
+					}
+					if(gGatherCnt < 2)
+					{
+						(*unit).first->gather(this->getClosestUnit((*unit).first, UnitTypes::Terran_Refinery, 500),false);
+					}else
+					{
+						(*unit).first->gather(this->getClosestMineral((*unit).first),false);
+					}
+					
+				}
+			}
 		}
 	}
 	
