@@ -91,12 +91,14 @@ Position ExampleAIModule::findGuardPoint()
 std::vector<TilePosition> ExampleAIModule::findBuildingSites(Unit* worker, BWAPI::UnitType type, int amount, Unit* baseCenter)
 {
 	std::vector<TilePosition> returnPositions;
+	if(amount < 1) return returnPositions;
+
 	TilePosition origin(home->getCenter());
 	//TilePosition origin2(baseCenter->getRegion()->getCenter());
 	TilePosition providedOrigin = baseCenter->getTilePosition();
 	TilePosition deltaPos = origin;
 	
-
+#pragma region
 	//if(baseCenter->getType() == BWAPI::UnitTypes::Terran_Command_Center)
 	//{
 		deltaPos -= providedOrigin;
@@ -109,18 +111,38 @@ std::vector<TilePosition> ExampleAIModule::findBuildingSites(Unit* worker, BWAPI
 		else
 			deltaPos.y() = 1;
 	//}
+#pragma endregion calculate delta
 
 	//Lets do a switch case for the different building types
 	if(type == BWAPI::UnitTypes::Terran_Barracks)
 	{
 		//Build at center of region.
-		returnPositions.push_back(origin);
+		int foundPos = 0;
+		int xLimit = 4, yLimit = 1;
+		for(int x = 0; x < xLimit && foundPos < amount; x++)
+		{
+			for(int y = 0; y < yLimit && foundPos < amount; y++)
+			{
+				TilePosition bPos = providedOrigin;
+				if(deltaPos.x() > 0)
+					bPos += TilePosition((BWAPI::UnitTypes::Terran_Command_Center.tileWidth()+1) * deltaPos.x() /*The starting point of the xPos*/, 0 /*The starting point of the yPos which we don't want to change*/);
+				else
+					bPos += TilePosition(1 * deltaPos.x() /*The starting point of the xPos*/, 0 /*The starting point of the yPos which we don't want to change*/);
+				bPos += TilePosition(x * type.tileWidth() * deltaPos.x(), 0 /*y * type.tileHeight() * deltaPos.y()*/);
+				if(Broodwar->canBuildHere(worker, bPos, type, false))
+				{
+					foundPos++;
+					returnPositions.push_back(bPos);
+				}
+			}
+		}
+		/*returnPositions.push_back(origin);*/
 	}
 	else if(type == BWAPI::UnitTypes::Terran_Supply_Depot || type == BWAPI::UnitTypes::Terran_Academy)
 	{
 		int foundPos = 0;
 		int xLimit = 4, yLimit = 3;
-		for(int x = 0; x < 4 && foundPos < amount; x++)
+		for(int x = 0; x < xLimit && foundPos < amount; x++)
 		{
 			for(int y = 0; y < yLimit && foundPos < amount; y++)
 			{
@@ -173,7 +195,26 @@ std::vector<TilePosition> ExampleAIModule::findBuildingSites(Unit* worker, BWAPI
 	//}
 	else if(type == BWAPI::UnitTypes::Terran_Factory)
 	{
-		
+		//Build on top of barracks, their yPosition won't fluctuate. Construct on opposit side of supple depot.
+		int foundPos = 0;
+		int xLimit = 4, yLimit = 1;
+		for(int x = 0; x < xLimit && foundPos < amount; x++)
+		{
+			for(int y = 0; y < yLimit && foundPos < amount; y++)
+			{
+				TilePosition bPos = providedOrigin;
+				if(deltaPos.x() > 0)
+					bPos += TilePosition((BWAPI::UnitTypes::Terran_Command_Center.tileWidth()+1) * deltaPos.x() /*The starting point of the xPos*/, 1 * deltaPos.y() /*The starting point of the yPos which we do want to change*/);
+				else
+					bPos += TilePosition(1 * deltaPos.x() /*The starting point of the xPos*/, 1 * deltaPos.y() /*The starting point of the yPos which we do want to change*/);
+				bPos += TilePosition(x * type.tileWidth() * deltaPos.x(), 0 /*y * type.tileHeight() * deltaPos.y()*/);
+				if(Broodwar->canBuildHere(worker, bPos, type, false))
+				{
+					foundPos++;
+					returnPositions.push_back(bPos);
+				}
+			}
+		}
 	}
 	return returnPositions;
 }
@@ -212,7 +253,7 @@ void ExampleAIModule::step1()
 				{
 					if((*i)->getType().isWorker())
 					{
-						this->constructBuilding(this->findBuildingSites(*i, UnitTypes::Terran_Barracks, 1, this->commandCenters.front()), *i, UnitTypes::Terran_Barracks); 
+						this->constructBuilding(this->findBuildingSites(*i, UnitTypes::Terran_Barracks, 2, this->commandCenters.front()), (*i), UnitTypes::Terran_Barracks); 
 						//this->buildBarracks(this->findBuildingSites(BWAPI::UnitTypes::Terran_Barracks, 1).front());
 						break;
 					}
@@ -286,14 +327,15 @@ void ExampleAIModule::step1()
 
 void ExampleAIModule::step2()
 {	
-
 	
-#pragma region
 	//Built academy
 	int academyCnt = Broodwar->self()->completedUnitCount(UnitTypes::Terran_Academy) + Broodwar->self()->incompleteUnitCount(UnitTypes::Terran_Academy);
 	int refineryCnt = Broodwar->self()->completedUnitCount(UnitTypes::Terran_Refinery) + Broodwar->self()->incompleteUnitCount(UnitTypes::Terran_Refinery);
+	const int wantedMedicCap = 3;
+	const int wantedWorkerCap = 5;
 	
 	//int obj = 0;	//Build academy
+#pragma region
 	switch(this->actObjective)
 	{
 	case 0:
@@ -316,10 +358,10 @@ void ExampleAIModule::step2()
 		this->actObjective = 3;
 		break;
 	case 3:
-		if(Broodwar->self()->completedUnitCount(BWAPI::UnitTypes::Terran_Medic) + Broodwar->self()->incompleteUnitCount(BWAPI::UnitTypes::Terran_Medic) >= 3)
+		if(Broodwar->self()->completedUnitCount(BWAPI::UnitTypes::Terran_Medic) + Broodwar->self()->incompleteUnitCount(BWAPI::UnitTypes::Terran_Medic) >= wantedMedicCap)
 		{
-			int workerCnt = Broodwar->self()->completedUnitCount(BWAPI::UnitTypes::Terran_Medic) + Broodwar->self()->incompleteUnitCount(BWAPI::UnitTypes::Terran_Medic) - 4;	//4 is the initial worker count
-			if(workerCnt >= 5)
+			int workerCnt = Broodwar->self()->completedUnitCount(BWAPI::UnitTypes::Terran_SCV) + Broodwar->self()->incompleteUnitCount(BWAPI::UnitTypes::Terran_SCV) - 4;	//4 is the initial worker count
+			if(workerCnt >= wantedWorkerCap)
 			{
 				this->actObjective = 4;
 			}
@@ -333,15 +375,9 @@ void ExampleAIModule::step2()
 	default:
 		break;
 	}
+#pragma endregion Calculate the objective currently being executed
 	
-	/*for(std::set<Unit*>::const_iterator i = Broodwar->self()->getUnits().begin(); i != Broodwar->self()->getUnits().end(); i++)
-	{
-		if((*i)->getType() == UnitTypes::Terran_Academy)
-		{
 
-		}
-	}*/
-#pragma endregion checks objective
 	Broodwar->printf("Completing objective %d!", this->actObjective);
 	switch(this->actObjective)
 	{
@@ -388,14 +424,19 @@ void ExampleAIModule::step2()
 				for(std::vector<Unit*>::iterator unit = hiredWorkers.begin(); unit != hiredWorkers.end(); unit++)
 				{
 					//Set it to  gather gas form the refinery
-					for(std::set<Unit*>::const_iterator refinery = Broodwar->self()->getUnits().begin(); refinery != Broodwar->self()->getUnits().end(); refinery++)
+					Unit* refinery = this->getClosestUnit((*unit), BWAPI::UnitTypes::Terran_Refinery, 2000);
+					if(refinery != NULL)
+						(*unit)->gather(refinery, false);
+					else
+						Broodwar->printf("Did not find a terran refinery!");
+					/*for(std::set<Unit*>::const_iterator refinery = Broodwar->self()->getUnits().begin(); refinery != Broodwar->self()->getUnits().end(); refinery++)
 					{
 						if((*refinery)->getType() == BWAPI::UnitTypes::Terran_Refinery)
 						{
 							(*unit)->gather((*refinery), false);
 							break;
 						}
-					}
+					}*/
 				}
 				this->findAndChange(21, 0);
 			}
@@ -404,7 +445,7 @@ void ExampleAIModule::step2()
 	case 3:	//Create 5 workers and 3 medics
 		{
 			int medicCnt = Broodwar->self()->completedUnitCount(BWAPI::UnitTypes::Terran_Medic) + Broodwar->self()->incompleteUnitCount(BWAPI::UnitTypes::Terran_Medic);
-			int workerCnt = Broodwar->self()->completedUnitCount(BWAPI::UnitTypes::Terran_Medic) + Broodwar->self()->incompleteUnitCount(BWAPI::UnitTypes::Terran_Medic) - 4;	//4 is the initial worker count
+			int workerCnt = Broodwar->self()->completedUnitCount(BWAPI::UnitTypes::Terran_SCV) + Broodwar->self()->incompleteUnitCount(BWAPI::UnitTypes::Terran_SCV) - 4;	//4 is the initial worker count
 			//Try to create workers before creating medics. To boost the economy
 			if(workerCnt < 5)	//Create workers
 			{
@@ -427,7 +468,8 @@ void ExampleAIModule::step2()
 						{
 							//Try to train medics until the AI player has 3. Also send them to chokepoint.
 							this->trainUnits((*barrack), BWAPI::UnitTypes::Terran_Medic, 3 - medicCnt);
-						}
+						}else
+							Broodwar->printf("%s cannot create any %s!", (*barrack)->getType().getName().c_str(), UnitTypes::Terran_Medic.getName().c_str());
 						break;
 					}
 				}
@@ -441,6 +483,24 @@ void ExampleAIModule::step2()
 	default:
 		break; //Not necessary
 	}
+}
+
+void ExampleAIModule::step3()
+{
+	//Intel on objectives
+	int factoryCnt = Broodwar->self()->completedUnitCount(BWAPI::UnitTypes::Terran_Factory) + Broodwar->self()->incompleteUnitCount(BWAPI::UnitTypes::Terran_Factory);
+	int factoryAddOnCnt = Broodwar->self()->completedUnitCount(BWAPI::UnitTypes::Terran_Machine_Shop) + Broodwar->self()->incompleteUnitCount(BWAPI::UnitTypes::Terran_Machine_Shop);
+	int siegeTankCnt = Broodwar->self()->completedUnitCount(UnitTypes::Terran_Siege_Tank_Siege_Mode) + Broodwar->self()->completedUnitCount(UnitTypes::Terran_Siege_Tank_Tank_Mode) + Broodwar->self()->incompleteUnitCount(UnitTypes::Terran_Siege_Tank_Tank_Mode) + Broodwar->self()->incompleteUnitCount(UnitTypes::Terran_Siege_Tank_Siege_Mode);
+
+#pragma region
+#pragma endregion Calculating objective clearance
+
+#pragma region
+#pragma endregion Completing objective
+}
+
+void ExampleAIModule::step4()
+{
 }
 
 
@@ -545,13 +605,13 @@ void ExampleAIModule::onFrame()
 				if((*unit)->isCompleted())
 				{
 					//Add to lists according to type
-					if((*unit)->getType().isWorker())
+					if((*unit)->getType() == BWAPI::UnitTypes::Terran_SCV)
 					{
 						//Make the worker gather minerals or gas, depending on need
+						(*unit)->stop();
 						this->builders.insert((*unit));
 						this->builders2.push_back(std::pair<Unit*, int>((*unit), 0));	//Start it off with a HiredID of 0. May change in the future.
 					}
-					(*unit)->stop();
 					//Remove it from this list
 					this->newlyCreatedUnits.erase(unit);
 				}
@@ -577,11 +637,13 @@ void ExampleAIModule::onFrame()
 								gGatherCnt++;
 						}
 					}
-					if(gGatherCnt < 2)
+					if(gGatherCnt < 2 && Broodwar->self()->completedUnitCount(BWAPI::UnitTypes::Terran_Refinery) > 0)
 					{
+						Broodwar->printf("Assigning idle worker with hireID %d to gather gas.", (*unit).second);
 						(*unit).first->gather(this->getClosestUnit((*unit).first, UnitTypes::Terran_Refinery, 500),false);
 					}else
 					{
+						Broodwar->printf("Assigning idle worker with hireID %d to gather minerals.", (*unit).second);
 						(*unit).first->gather(this->getClosestMineral((*unit).first),false);
 					}
 					
@@ -589,7 +651,7 @@ void ExampleAIModule::onFrame()
 			}
 		}
 	}
-	
+#pragma region
 	//Call every 100:th frame
 	if (Broodwar->getFrameCount() % 100 == 0)
 	{
@@ -608,10 +670,14 @@ void ExampleAIModule::onFrame()
 						this->step2();
 						break;
 					case 2:
+						this->step3();
 						break;
 					case 3:
+						this->step4();
 						break;
-					case 4:
+					case 4:	/*currently no fifth step that we want to achive within the AI behaviour*/
+						break;
+					default:	//So we have an exit
 						break;
 				}
 				//Only initialize one step at a time
@@ -619,7 +685,7 @@ void ExampleAIModule::onFrame()
 			}
 		}
 	}
-  
+#pragma endregion Call functions with AI logic divitions
 	//Draw lines around regions, chokepoints etc.
 	if (analyzed)
 	{
@@ -741,13 +807,13 @@ Unit* ExampleAIModule::getClosestUnit(Unit* mine, BWAPI::UnitType targetType, in
 	//Get the set of units within given radius of the unit, itterate through them and select the one closest
 	Unit* closest = NULL;
 	std::set<Unit*> unitsInRange = mine->getUnitsInRadius(radius);
-	int distance = radius;
+	int distance(radius);
 	for(std::set<Unit*>::const_iterator targetUnit = unitsInRange.begin(); targetUnit != unitsInRange.end(); targetUnit++)
 	{
 		//Check corrected type
 		if((*targetUnit)->getType() == targetType)
 		{	//Check distance
-			if(mine->getDistance((*targetUnit)) <= distance)
+			if(mine->getDistance((*targetUnit)) < distance)
 			{
 				distance = mine->getDistance((*targetUnit));
 				closest = (*targetUnit);
@@ -872,8 +938,6 @@ void ExampleAIModule::onUnitCreate(BWAPI::Unit* unit)
 	if (unit->getPlayer() == Broodwar->self())
 	{
 		Broodwar->sendText("A %s [%x] has been created at (%d,%d)",unit->getType().getName().c_str(),unit,unit->getPosition().x(),unit->getPosition().y());
-		//Add it to our list of newlyCreatedUnits
-		this->newlyCreatedUnits.insert(unit);
 	}
 }
 
@@ -1050,4 +1114,10 @@ void ExampleAIModule::showForces()
 void ExampleAIModule::onUnitComplete(BWAPI::Unit *unit)
 {
 	//Broodwar->sendText("A %s [%x] has been completed at (%d,%d)",unit->getType().getName().c_str(),unit,unit->getPosition().x(),unit->getPosition().y());
+	if(unit->getPlayer() == Broodwar->self())
+	{
+		//Add it to our list of newlyCreatedUnits
+		if(!unit->getType().isBuilding())
+			this->newlyCreatedUnits.insert(unit);
+	}
 }

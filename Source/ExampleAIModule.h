@@ -55,6 +55,8 @@ public:
 
 	void step1();
 	void step2();
+	void step3();
+	void step4();
 	
 	void constructBuilding(std::vector<BWAPI::TilePosition> pos, Unit* worker, BWAPI::UnitType building);
 	void trainUnits(Unit* trainer, BWAPI::UnitType unit, int amount);
