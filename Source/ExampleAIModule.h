@@ -20,8 +20,9 @@ private:
 	int actObjective;
 	std::set<Unit*> builders;
 	std::vector<std::pair<Unit*, int>> builders2;
+	std::vector<std::pair<Unit*, int>> army;
 	std::vector<Unit*> commandCenters;
-	std::set<Unit*> newlyCreatedUnits;
+	std::set<Unit*> needToAdd;
 	//std::vector<TilePosition> buildPositions;
 public:
 	//Methods inherited from BWAPI:AIModule
