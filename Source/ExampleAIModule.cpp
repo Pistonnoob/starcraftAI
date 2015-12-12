@@ -734,34 +734,63 @@ void ExampleAIModule::constructBuilding(std::vector<BWAPI::TilePosition> positio
 //shall be called.
 void ExampleAIModule::onFrame()
 {
-	//Check every second frame
-	if(Broodwar->getFrameCount() % 2 == 0)
+		//Check every frame
+#pragma region
+	//Check if there has been any units created
+#pragma region
+	if(!this->needToAdd.empty())
 	{
-		//Check if there has been any units created
-		if(!this->needToAdd.empty())
+		//For every unit, check if it has been finished yet. If so then add it to the responding lists
+		for(std::set<Unit*>::iterator unit = this->needToAdd.begin(); unit != this->needToAdd.end(); unit++)
 		{
-			//For every unit, check if it has been finished yet. If so then add it to the responding lists
-			for(std::set<Unit*>::iterator unit = this->needToAdd.begin(); unit != this->needToAdd.end(); unit++)
+			UnitType unitType = (*unit)->getType();
+			if((*unit)->isCompleted())
 			{
-				if((*unit)->isCompleted())
+				//Add to lists according to type
+				if(!unitType.isBuilding())
 				{
-					//Add to lists according to type
-					if((*unit)->getType() == BWAPI::UnitTypes::Terran_SCV)
+					if(unitType == BWAPI::UnitTypes::Terran_SCV)
 					{
-						//Make the worker gather minerals or gas, depending on need
-						(*unit)->stop();
+						(*unit)->stop();		//We need to make workers idle so they are fetched be the Idle Gather behavior
 						this->builders.insert((*unit));
 						this->builders2.push_back(std::pair<Unit*, int>((*unit), 0));	//Start it off with a HiredID of 0. May change in the future.
 					}else
 					{
 						this->army.push_back(std::pair<Unit*, int>((*unit), 0));		//Start new army units off with a ID of 0.
 					}
-					//Remove it from this list
-					this->needToAdd.erase(unit);
+				}else
+				{
+					if(unitType == UnitTypes::Terran_Command_Center)
+						this->commandCenters.push_back((*unit));
 				}
+				//Remove it from this list
+				this->needToAdd.erase(unit);
 			}
 		}
-		//Apply individual unit behaviour
+	}
+#pragma endregion Unit creation logic
+
+	//Do the army behavior
+#pragma region
+	for(std::vector<std::pair<Unit*, int>>::iterator armyUnit = this->army.begin(); armyUnit != this->army.end(); armyUnit++)
+	{
+	//Do the tank behavior
+#pragma region
+#pragma endregion Tank behavior
+	//Do the medic behavior
+#pragma region
+#pragma endregion Medic behavior
+	}
+#pragma endregion Army behavior
+
+#pragma endregion Frame dependant behavior
+
+	//Check every second frame. Slightly less important behaviors such as the Idle Worker behavior
+#pragma region
+	if(Broodwar->getFrameCount() % 2 == 0)
+	{
+#pragma region
+		//Apply gathering behavior for workers
 		for(std::vector<std::pair<Unit*, int>>::iterator unit = this->builders2.begin(); unit != this->builders2.end(); unit++)
 		{
 			//Make idle workers gather either minerals or gas depending on the need
@@ -801,7 +830,11 @@ void ExampleAIModule::onFrame()
 				}
 			}
 		}
+#pragma endregion Idle worker gathering behavior
 	}
+#pragma endregion SecondFrameUpdates
+
+
 #pragma region
 	//Call every 100:th frame
 	if (Broodwar->getFrameCount() % 60 == 0)
@@ -1296,7 +1329,7 @@ void ExampleAIModule::onUnitComplete(BWAPI::Unit *unit)
 	if(unit->getPlayer() == Broodwar->self())
 	{
 		//Add it to our list of needToAdd
-		if(!unit->getType().isBuilding())
+		/*if(!unit->getType().isBuilding())*/
 			this->needToAdd.insert(unit);
 	}
 }
