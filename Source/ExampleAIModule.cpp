@@ -774,6 +774,43 @@ void ExampleAIModule::onFrame()
 #pragma region
 	for(std::vector<std::pair<Unit*, int>>::iterator armyUnit = this->army.begin(); armyUnit != this->army.end(); armyUnit++)
 	{
+		BWAPI::UnitType type = armyUnit->first->getType();
+		if(type == UnitTypes::Terran_Marine)
+		{
+		}else if(type == UnitTypes::Terran_Siege_Tank_Tank_Mode || type == UnitTypes::Terran_Siege_Tank_Siege_Mode)
+		{
+		}else if(type == UnitTypes::Terran_Medic)
+		{
+			//Check if cooldown on healing is off
+			if(armyUnit->first->getSpellCooldown() <= 0)
+			{
+				//Get units in range and find the least healthy unit as healing target
+				std::set<Unit*> inRange = armyUnit->first->getUnitsInWeaponRange(type.groundWeapon());
+				std::pair<Unit*,int> leastHealth(NULL, -1);
+				for(std::set<Unit*>::iterator inRangeUnit = inRange.begin(); inRangeUnit != inRange.end(); inRangeUnit++)
+				{
+					if((*inRangeUnit)->getPlayer() == Broodwar->self())
+					{
+						int curHP = (*inRangeUnit)->getHitPoints();
+						if(leastHealth.first != NULL || curHP < leastHealth.second)
+						{
+							leastHealth.first = (*inRangeUnit);
+							leastHealth.second = (*inRangeUnit)->getHitPoints();
+						}
+					}
+				}
+				if(leastHealth.first != NULL)
+				{
+					if(!(*armyUnit).first->useTech(TechTypes::Healing, leastHealth.first))
+					{	//Invalid tech
+						Broodwar->printf("%s could not use %s on %s!", type.c_str(), TechTypes::Healing.c_str(), leastHealth.first->getType().c_str());
+					}
+				}
+				}
+		}else
+		{
+			//Some unknown unit. Don't print anything, if there is a problem it will show on every frame which will be extremly anoying
+		}
 	//Do the tank behavior
 #pragma region
 #pragma endregion Tank behavior
