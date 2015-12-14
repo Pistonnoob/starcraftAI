@@ -4,6 +4,8 @@
 #include <BWTA.h>
 #include <windows.h>
 
+#include "Commander.h"
+
 extern bool analyzed;
 extern bool analysis_just_finished;
 extern BWTA::Region* home;
@@ -20,9 +22,10 @@ private:
 	int actObjective;
 	std::set<Unit*> builders;
 	std::vector<std::pair<Unit*, int>> builders2;
-	std::vector<std::pair<Unit*, int>> army;
 	std::vector<Unit*> commandCenters;
 	std::set<Unit*> needToAdd;
+	
+	Commander rallyCommander;
 	//std::vector<TilePosition> buildPositions;
 public:
 	//Methods inherited from BWAPI:AIModule
