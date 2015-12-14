@@ -23,6 +23,7 @@ private:
 	std::vector<std::pair<Unit*, int>> army;
 	std::vector<Unit*> commandCenters;
 	std::set<Unit*> needToAdd;
+	BWAPI::Position rallyPos;
 	//std::vector<TilePosition> buildPositions;
 public:
 	//Methods inherited from BWAPI:AIModule
@@ -61,6 +62,7 @@ public:
 	
 	void constructBuilding(std::vector<BWAPI::TilePosition> pos, Unit* worker, BWAPI::UnitType building);
 	void trainUnits(Unit* trainer, BWAPI::UnitType unit, int amount);
+	void researchTech(Unit* trainer = NULL, TechType = TechTypes::None);
 	bool hasResFor(UnitType type)const;
 	
 	
