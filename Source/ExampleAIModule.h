@@ -24,6 +24,7 @@ private:
 	std::vector<Unit*> commandCenters;
 	std::set<Unit*> needToAdd;
 	BWAPI::Position rallyPos;
+	int rallyArea;
 	//std::vector<TilePosition> buildPositions;
 public:
 	//Methods inherited from BWAPI:AIModule

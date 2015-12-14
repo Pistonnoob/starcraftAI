@@ -16,7 +16,7 @@ void ExampleAIModule::onStart()
 	//Enable flags
 	Broodwar->enableFlag(Flag::UserInput);
 	//Uncomment to enable complete map information
-	//Broodwar->enableFlag(Flag::CompleteMapInformation);
+	Broodwar->enableFlag(Flag::CompleteMapInformation);
 
 	//Start analyzing map data
 	BWTA::readMap();
@@ -51,6 +51,7 @@ void ExampleAIModule::onStart()
 		}
 	}
 	this->rallyPos = this->findGuardPoint();
+	this->rallyArea = 80;
 	Broodwar->sendText("power overwhelming");
 }
 
@@ -210,7 +211,7 @@ std::vector<TilePosition> ExampleAIModule::findBuildingSites(Unit* worker, BWAPI
 				if(deltaPos.x() > 0)
 					bPos += TilePosition((UnitTypes::Terran_Command_Center.tileWidth()) * deltaPos.x() /*The starting point of the xPos*/,0);
 				else
-					bPos += TilePosition(type.tileWidth() * deltaPos.x() /*The starting point of the xPos*/,0);
+					bPos += TilePosition((type.tileWidth() + 1) * deltaPos.x() /*The starting point of the xPos*/,0);
 				if(deltaPos.y() > 0)
 					bPos += TilePosition(0, type.tileHeight() * deltaPos.y() * -1);
 				else
@@ -307,6 +308,12 @@ void ExampleAIModule::step1()
 								std::vector<BWAPI::TilePosition> supplyPos = this->findBuildingSites((*i), BWAPI::UnitTypes::Terran_Supply_Depot, 2 - supplyDepotCnt, this->commandCenters[0]);
 								this->constructBuilding(supplyPos, (*i), UnitTypes::Terran_Supply_Depot);
 								break;
+							}else
+							{
+								if((*i)->getBuildType() == UnitTypes::Terran_Supply_Depot)
+								{
+									break;
+								}
 							}
 						}
 					}
@@ -380,7 +387,7 @@ void ExampleAIModule::step2()
 		this->actObjective = 3;
 		break;
 	case 3:
-		if(medicCnt >= wantedMedicCap)
+		if(Broodwar->self()->completedUnitCount(UnitTypes::Terran_Medic) >= wantedMedicCap)
 		{
 			if(workerCnt >= wantedWorkerCap)
 			{
@@ -551,7 +558,7 @@ void ExampleAIModule::step3()
 		//BWAPI::TechTypes
 		if(Broodwar->self()->hasResearched(BWAPI::TechTypes::Tank_Siege_Mode) && Broodwar->self()->completedUnitCount(BWAPI::UnitTypes::Terran_Machine_Shop) > 0/* || Broodwar->self()->isResearching(BWAPI::TechTypes::Tank_Siege_Mode)*/)
 		{
-			this->actObjective = 3;
+			this->actObjective = 4;
 		}
 		
 		break;
@@ -711,7 +718,23 @@ void ExampleAIModule::step3()
 
 void ExampleAIModule::step4()
 {
-
+	//Set their new attack order along with the AIs new rally position
+	this->rallyPos = Position(Broodwar->enemy()->getStartLocation());
+	for(std::vector<std::pair<Unit*, int>>::iterator armyUnit = this->army.begin(); armyUnit != this->army.end(); armyUnit++)
+	{
+		//If unit can walk
+		if(armyUnit->first->getType().canMove())
+		{
+			if(armyUnit->first->getTargetPosition().getDistance(this->rallyPos) < 20)
+			{
+				//It is at least trying to get to the rally point
+			}else
+				armyUnit->first->attack(this->rallyPos, true);
+			//armyUnit->first->attack(this->rallyPos, true);
+			//armyUnit->first->holdPosition(true);
+		}//If unit can walk
+		
+	}
 }
 
 
@@ -811,6 +834,8 @@ void ExampleAIModule::constructBuilding(std::vector<BWAPI::TilePosition> positio
 //shall be called.
 void ExampleAIModule::onFrame()
 {
+	if(Broodwar->getFrameCount() > 10)
+	{
 		//Check every frame
 #pragma region
 	//Check if there has been any units created
@@ -855,7 +880,6 @@ void ExampleAIModule::onFrame()
 		if(type == UnitTypes::Terran_Marine)
 		{	//Do the marine behavior
 #pragma region
-			
 			//Check stim pack cooldown
 			TechType techToUse = TechTypes::Stim_Packs;
 			if(Broodwar->self()->hasResearched(techToUse))
@@ -892,23 +916,38 @@ void ExampleAIModule::onFrame()
 				//If there is a unit within sighrange, go into siege mode, if not then proceed in tank mode
 				//check if there are units nearby
 				std::set<Unit*> unitsInRange = armyUnit->first->getUnitsInRadius(type.sightRange());
+				bool foundEnemy = false;
 				if(!unitsInRange.empty())
 				{
-					if(armyUnit->first->getType() == UnitTypes::Terran_Siege_Tank_Tank_Mode)
+					for(std::set<Unit*>::iterator unitInRange = unitsInRange.begin(); unitInRange != unitsInRange.end() && !foundEnemy; unitInRange++)
 					{
-						//Try to go into siege mode
-						//The set of abilities the unit has the tech and energy to use
-						std::set<BWAPI::TechType> abilities = type.abilities();
-						//Check for a techToUse
-						if(!abilities.empty() || abilities.find(techToUse) != abilities.end())
-						{	//Found the stim pack ability
-							if(!armyUnit->first->useTech(techToUse))
-							{	//Invalid tech
-								Broodwar->printf("%s could not go into %s!", type.c_str(), UnitTypes::Terran_Siege_Tank_Siege_Mode.c_str());
-							}	
+						Player* pl = (*unitInRange)->getPlayer();
+						//if(pl->getType() != PlayerTypes::None && pl->getType() != PlayerTypes::Neutral && pl->getType() != PlayerTypes::Unknown)
+						if(pl == Broodwar->enemy())
+						{
+							foundEnemy = true;
 						}
 					}
-				}else
+					
+					if(foundEnemy)
+					{
+						if(armyUnit->first->getType() == UnitTypes::Terran_Siege_Tank_Tank_Mode)
+						{
+							//Try to go into siege mode
+							//The set of abilities the unit has the tech and energy to use
+							std::set<BWAPI::TechType> abilities = type.abilities();
+							//Check for a techToUse
+							if(!abilities.empty() || abilities.find(techToUse) != abilities.end())
+							{	//Found the stim pack ability
+								if(!armyUnit->first->useTech(techToUse))
+								{	//Invalid tech
+									Broodwar->printf("%s could not go into %s!", type.c_str(), UnitTypes::Terran_Siege_Tank_Siege_Mode.c_str());
+								}	
+							}
+						}
+					}
+				}
+				if(!foundEnemy)
 				{
 					if(armyUnit->first->getType() == UnitTypes::Terran_Siege_Tank_Siege_Mode)
 					{
@@ -1018,7 +1057,7 @@ void ExampleAIModule::onFrame()
 
 #pragma region
 	//Call every 100:th frame
-	if (Broodwar->getFrameCount() % 60 == 0)
+	if (Broodwar->getFrameCount() % 100 == 0)
 	{
 		//Complete first step, if completed, move on to next check
 		for(int i = 0; i < 5; i++)
@@ -1057,6 +1096,7 @@ void ExampleAIModule::onFrame()
 		drawTerrainData();
 	}
 	//Broodwar->printf("It works");
+	}
 }
 
 
@@ -1473,6 +1513,8 @@ void ExampleAIModule::drawStats()
 //No need to change this.
 void ExampleAIModule::drawTerrainData()
 {
+	//Draw the rally area
+	Broodwar->drawCircle(CoordinateType::Map, this->rallyPos.x(), this->rallyPos.y(), this->rallyArea, BWAPI::Colors::Red, false);
 	//Iterate through all the base locations, and draw their outlines.
 	for(std::set<BWTA::BaseLocation*>::const_iterator i=BWTA::getBaseLocations().begin();i!=BWTA::getBaseLocations().end();i++)
 	{
