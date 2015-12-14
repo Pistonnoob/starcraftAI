@@ -208,9 +208,9 @@ std::vector<TilePosition> ExampleAIModule::findBuildingSites(Unit* worker, BWAPI
 			{
 				TilePosition bPos = providedOrigin;
 				if(deltaPos.x() > 0)
-					bPos += TilePosition((BWAPI::UnitTypes::Terran_Command_Center.tileWidth()+1) * deltaPos.x() /*The starting point of the xPos*/, 1 * deltaPos.y() /*The starting point of the yPos which we do want to change*/);
+					bPos += TilePosition((BWAPI::UnitTypes::Terran_Command_Center.tileWidth()+1) * deltaPos.x() /*The starting point of the xPos*/, -1 * type.tileHeight() * deltaPos.y() /*The starting point of the yPos which we do want to change*/);
 				else
-					bPos += TilePosition(1 * deltaPos.x() /*The starting point of the xPos*/, 1 * deltaPos.y() /*The starting point of the yPos which we do want to change*/);
+					bPos += TilePosition(1 * deltaPos.x() /*The starting point of the xPos*/, -1 * type.tileHeight() * deltaPos.y() /*The starting point of the yPos which we do want to change*/);
 				bPos += TilePosition(x * type.tileWidth() * deltaPos.x(), 0 /*y * type.tileHeight() * deltaPos.y()*/);
 				if(Broodwar->canBuildHere(worker, bPos, type, false))
 				{
@@ -230,8 +230,9 @@ void ExampleAIModule::step1()
 	int obj = 0;
 	Unit* barrackPtr = NULL;
 	Position guardPnt = this->findGuardPoint();
-	int marineCnt = Broodwar->self()->completedUnitCount(BWAPI::UnitTypes::Terran_Marine) + Broodwar->self()->incompleteUnitCount(BWAPI::UnitTypes::Terran_Marine);
+	//int marineCnt = Broodwar->self()->completedUnitCount(BWAPI::UnitTypes::Terran_Marine) + Broodwar->self()->incompleteUnitCount(BWAPI::UnitTypes::Terran_Marine);
 	int supplyDepotCnt = Broodwar->self()->completedUnitCount(UnitTypes::Terran_Supply_Depot) + Broodwar->self()->incompleteUnitCount(UnitTypes::Terran_Supply_Depot);
+	int marineCnt = this->getUnitCount(UnitTypes::Terran_Marine);
 	for(std::set<Unit*>::const_iterator i=Broodwar->self()->getUnits().begin();i!=Broodwar->self()->getUnits().end();i++)
 	{
 		if((*i)->getType() == BWAPI::UnitTypes::Terran_Barracks)
@@ -340,7 +341,8 @@ void ExampleAIModule::step2()
 	int refineryCnt = Broodwar->self()->completedUnitCount(UnitTypes::Terran_Refinery) + Broodwar->self()->incompleteUnitCount(UnitTypes::Terran_Refinery);
 	const int wantedMedicCap = 3;
 	const int wantedWorkerCap = 5;
-	
+	int medicCnt = this->getUnitCount(UnitTypes::Terran_Medic);
+	int workerCnt = this->getUnitCount(UnitTypes::Terran_SCV) - 4;	//4 is the initial worker count
 	//int obj = 0;	//Build academy
 #pragma region
 	switch(this->actObjective)
@@ -365,9 +367,8 @@ void ExampleAIModule::step2()
 		this->actObjective = 3;
 		break;
 	case 3:
-		if(Broodwar->self()->completedUnitCount(BWAPI::UnitTypes::Terran_Medic) + Broodwar->self()->incompleteUnitCount(BWAPI::UnitTypes::Terran_Medic) >= wantedMedicCap)
+		if(medicCnt >= wantedMedicCap)
 		{
-			int workerCnt = Broodwar->self()->completedUnitCount(BWAPI::UnitTypes::Terran_SCV) + Broodwar->self()->incompleteUnitCount(BWAPI::UnitTypes::Terran_SCV) - 4;	//4 is the initial worker count
 			if(workerCnt >= wantedWorkerCap)
 			{
 				this->actObjective = 4;
@@ -449,10 +450,9 @@ void ExampleAIModule::step2()
 			}
 		}
 		break;
-	case 3:	//Create 5 workers and 3 medics
+	case 3:	//Create 5 workers and 3 medics and 1 supply depot
 		{
-			int medicCnt = Broodwar->self()->completedUnitCount(BWAPI::UnitTypes::Terran_Medic) + Broodwar->self()->incompleteUnitCount(BWAPI::UnitTypes::Terran_Medic);
-			int workerCnt = Broodwar->self()->completedUnitCount(BWAPI::UnitTypes::Terran_SCV) + Broodwar->self()->incompleteUnitCount(BWAPI::UnitTypes::Terran_SCV) - 4;	//4 is the initial worker count
+
 			//Try to create workers before creating medics. To boost the economy
 			if(workerCnt < 5)	//Create workers
 			{
@@ -460,7 +460,7 @@ void ExampleAIModule::step2()
 				{
 					if(Broodwar->canMake(this->commandCenters[0], UnitTypes::Terran_SCV))
 					{
-						this->trainUnits(this->commandCenters[0], UnitTypes::Terran_SCV, 5 - workerCnt);
+						this->trainUnits(this->commandCenters[0], UnitTypes::Terran_SCV, wantedWorkerCap - workerCnt);
 					}else
 						Broodwar->printf("%s cannot create any %s!", this->commandCenters[0]->getType().getName().c_str(), UnitTypes::Terran_SCV.getName().c_str());
 				}
@@ -474,13 +474,14 @@ void ExampleAIModule::step2()
 						if(Broodwar->canMake(NULL, BWAPI::UnitTypes::Terran_Medic))
 						{
 							//Try to train medics until the AI player has 3. Also send them to chokepoint.
-							this->trainUnits((*barrack), BWAPI::UnitTypes::Terran_Medic, 3 - medicCnt);
+							this->trainUnits((*barrack), BWAPI::UnitTypes::Terran_Medic, wantedMedicCap - medicCnt);
 						}else
 							Broodwar->printf("%s cannot create any %s!", (*barrack)->getType().getName().c_str(), UnitTypes::Terran_Medic.getName().c_str());
 						break;
 					}
 				}
 			}
+			
 		}
 		break;
 	case 4:	//In case something happened to the earlier switch case, redo the actions.
@@ -490,6 +491,26 @@ void ExampleAIModule::step2()
 	default:
 		break; //Not necessary
 	}
+	//Build a supply depot if needed
+	if(Broodwar->self()->supplyUsed() >= Broodwar->self()->supplyTotal())
+	{
+		//Build a supply depot
+		if(this->hasResFor(UnitTypes::Terran_Supply_Depot))
+		{
+			std::vector<Unit*> hiredWorkers = this->findWorker(26, UnitTypes::Terran_SCV);
+			if(hiredWorkers.empty())
+				hiredWorkers = this->findAndHire(26, UnitTypes::Terran_SCV, 1);					
+			if(!hiredWorkers.empty() && !this->commandCenters.empty())
+			{
+				std::vector<BWAPI::TilePosition> buildingSites = this->findBuildingSites(hiredWorkers[0], UnitTypes::Terran_Supply_Depot, 1, this->commandCenters[0]);
+				if(!buildingSites.empty())
+					this->constructBuilding(buildingSites, hiredWorkers[0], UnitTypes::Terran_Supply_Depot);
+			}
+		}
+	}else
+	{
+		this->findAndChange(26, 0, UnitTypes::Terran_SCV);
+	}
 }
 
 void ExampleAIModule::step3()
@@ -497,8 +518,8 @@ void ExampleAIModule::step3()
 	//Intel on objectives
 	int factoryCnt = Broodwar->self()->completedUnitCount(BWAPI::UnitTypes::Terran_Factory) + Broodwar->self()->incompleteUnitCount(BWAPI::UnitTypes::Terran_Factory);
 	int factoryAddOnCnt = Broodwar->self()->completedUnitCount(BWAPI::UnitTypes::Terran_Machine_Shop) + Broodwar->self()->incompleteUnitCount(BWAPI::UnitTypes::Terran_Machine_Shop);
-	int siegeTankCnt = Broodwar->self()->completedUnitCount(UnitTypes::Terran_Siege_Tank_Siege_Mode) + Broodwar->self()->completedUnitCount(UnitTypes::Terran_Siege_Tank_Tank_Mode) + Broodwar->self()->incompleteUnitCount(UnitTypes::Terran_Siege_Tank_Tank_Mode) + Broodwar->self()->incompleteUnitCount(UnitTypes::Terran_Siege_Tank_Siege_Mode);
-
+	//int siegeTankCnt = Broodwar->self()->completedUnitCount(UnitTypes::Terran_Siege_Tank_Siege_Mode) + Broodwar->self()->completedUnitCount(UnitTypes::Terran_Siege_Tank_Tank_Mode) + Broodwar->self()->incompleteUnitCount(UnitTypes::Terran_Siege_Tank_Tank_Mode) + Broodwar->self()->incompleteUnitCount(UnitTypes::Terran_Siege_Tank_Siege_Mode);
+	int siegeTankCnt = this->getUnitCount(UnitTypes::Terran_Siege_Tank_Tank_Mode) + this->getUnitCount(UnitTypes::Terran_Siege_Tank_Siege_Mode);
 #pragma region
 	switch(this->actObjective)
 	{
@@ -592,21 +613,32 @@ void ExampleAIModule::step3()
 	case 3:		//Research the siege mode for the terran tanks. pretty cool.
 		{
 			TechType type = TechTypes::Tank_Siege_Mode;
+			UnitType researchType = UnitTypes::Terran_Machine_Shop;	
+			std::pair<Unit*,int> earlistResearched = std::pair<Unit*,int>(NULL, -1);
 			if(!Broodwar->self()->hasResearched(type) && !Broodwar->self()->isResearching(type))
 			{
 				if(Broodwar->canResearch(NULL, type))
 				{
-					for(std::set<Unit*>::const_iterator academy = Broodwar->self()->getUnits().begin(); academy != Broodwar->self()->getUnits().end(); academy++)
+					for(std::set<Unit*>::const_iterator researcher = Broodwar->self()->getUnits().begin(); researcher != Broodwar->self()->getUnits().end(); researcher++)
 					{
-						if((*academy)->getType() == UnitTypes::Terran_Academy)
+						if((*researcher)->getType() == researchType)
 						{
-							if((*academy)->research(type))
+							if(Broodwar->canResearch((*researcher), type))
+							//if((*researcher)->research(type))
 							{
-								Broodwar->printf("%s succeeded to research %s", (*academy)->getType().getName().c_str(), type.getName().c_str());
-							}else
-								Broodwar->printf("%s failed to research %s", (*academy)->getType().getName().c_str(), type.getName().c_str());
+								int timeLeft = (*researcher)->getRemainingResearchTime();
+								if(earlistResearched.first == NULL || earlistResearched.second > timeLeft)
+									earlistResearched = std::pair<Unit*,int>((*researcher), timeLeft);
+								if(timeLeft == 0)
+									break;
+							}
 						}
 					}
+					if(earlistResearched.first->research(type))
+					{
+						Broodwar->printf("%s can research %s", earlistResearched.first->getType().c_str(), type.c_str());
+					}else
+						Broodwar->printf("%s failed to research %s", earlistResearched.first->getType().c_str(), type.c_str());
 				}
 			}
 		}
@@ -776,11 +808,83 @@ void ExampleAIModule::onFrame()
 	{
 		BWAPI::UnitType type = armyUnit->first->getType();
 		if(type == UnitTypes::Terran_Marine)
-		{
+		{	//Do the marine behavior
+#pragma region
+			//Check stim pack cooldown
+			if(armyUnit->first->getSpellCooldown() == 0)
+			{
+				//Check if health is above 50%. If so, use stim pack ability
+				if(armyUnit->first->getHitPoints() >= armyUnit->first->getType().maxHitPoints() * 0.5)
+				{
+					TechType techToUse = TechTypes::Stim_Packs;
+					if(armyUnit->first->getEnergy() >= techToUse.energyUsed())
+					{
+						if(Broodwar->self()->hasResearched(techToUse))
+						{
+							//The set of abilities the unit has the tech and energy to use
+							std::set<BWAPI::TechType> abilities = type.abilities();
+							//Check for a techToUse
+							if(!abilities.empty() || abilities.find(techToUse) != abilities.end())
+							{	//Found the stim pack ability
+								if(!armyUnit->first->useTech(techToUse))
+								{	//Invalid tech
+									Broodwar->printf("%s failed to use %s because it was invalid!", type.c_str(), techToUse.c_str());
+								}	
+							}
+						}
+					}
+				
+				}
+			}
+#pragma endregion Marine behavior
 		}else if(type == UnitTypes::Terran_Siege_Tank_Tank_Mode || type == UnitTypes::Terran_Siege_Tank_Siege_Mode)
-		{
+		{	//Do the tank behavior
+#pragma region
+			
+			TechType techToUse = TechTypes::Tank_Siege_Mode;
+			if(Broodwar->self()->hasResearched(techToUse))
+			{
+				//If there is a unit within sighrange, go into siege mode, if not then proceed in tank mode
+				//check if there are units nearby
+				std::set<Unit*> unitsInRange = armyUnit->first->getUnitsInRadius(type.sightRange());
+				if(!unitsInRange.empty())
+				{
+					if(armyUnit->first->getType() == UnitTypes::Terran_Siege_Tank_Tank_Mode)
+					{
+						//Try to go into siege mode
+						//The set of abilities the unit has the tech and energy to use
+						std::set<BWAPI::TechType> abilities = type.abilities();
+						//Check for a techToUse
+						if(!abilities.empty() || abilities.find(techToUse) != abilities.end())
+						{	//Found the stim pack ability
+							if(!armyUnit->first->useTech(techToUse))
+							{	//Invalid tech
+								Broodwar->printf("%s could not go into %s!", type.c_str(), UnitTypes::Terran_Siege_Tank_Siege_Mode.c_str());
+							}	
+						}
+					}
+				}else
+				{
+					if(armyUnit->first->getType() == UnitTypes::Terran_Siege_Tank_Siege_Mode)
+					{
+						//Try to go into tank mode
+						//The set of abilities the unit has the tech and energy to use
+						std::set<BWAPI::TechType> abilities = type.abilities();
+						//Check for a techToUse
+						if(!abilities.empty() || abilities.find(techToUse) != abilities.end())
+						{	//Found the stim pack ability
+							if(!armyUnit->first->useTech(techToUse))
+							{	//Invalid tech
+								Broodwar->printf("%s could not go into %s!", type.c_str(), UnitTypes::Terran_Siege_Tank_Tank_Mode.c_str());
+							}	
+						}
+					}
+				}
+			}
+#pragma endregion Tank behavior
 		}else if(type == UnitTypes::Terran_Medic)
-		{
+		{	//Do the medic behavior
+#pragma region
 			//Check if cooldown on healing is off
 			if(armyUnit->first->getSpellCooldown() <= 0)
 			{
@@ -806,17 +910,12 @@ void ExampleAIModule::onFrame()
 						Broodwar->printf("%s could not use %s on %s!", type.c_str(), TechTypes::Healing.c_str(), leastHealth.first->getType().c_str());
 					}
 				}
-				}
-		}else
-		{
-			//Some unknown unit. Don't print anything, if there is a problem it will show on every frame which will be extremly anoying
-		}
-	//Do the tank behavior
-#pragma region
-#pragma endregion Tank behavior
-	//Do the medic behavior
-#pragma region
+			}
+			
 #pragma endregion Medic behavior
+		}else
+		{	//Some unknown unit. Don't print anything, if there is a problem it will show on every frame which will be extremly anoying
+		}
 	}
 #pragma endregion Army behavior
 
@@ -855,13 +954,13 @@ void ExampleAIModule::onFrame()
 						Broodwar->printf("Assigning idle worker with hireID %d to gather gas.", (*unit).second);
 						Unit* refinery = this->getClosestUnit((*unit).first, BWAPI::UnitTypes::Terran_Refinery, 2000);
 						if(refinery != NULL)
-							(*unit).first->gather(refinery, false);
+							(*unit).first->rightClick(refinery, false);
 						else
 							Broodwar->printf("Did not find a terran refinery!");
 					}else
 					{
 						Broodwar->printf("Assigning idle worker with hireID %d to gather minerals.", (*unit).second);
-						(*unit).first->gather(this->getClosestMineral((*unit).first),false);
+						(*unit).first->rightClick(this->getClosestMineral((*unit).first),false);
 					}
 					
 				}
@@ -994,6 +1093,22 @@ int ExampleAIModule::findAndChange(int origID, int resultID, BWAPI::UnitType typ
 		}
 	}
 	return changeCnt;
+}
+
+int ExampleAIModule::getUnitCount(UnitType type, bool completedOnly)
+{
+	int amount = Broodwar->self()->completedUnitCount(type);
+	if(!completedOnly)
+	{
+		for(std::set<Unit*>::const_iterator unit = this->needToAdd.begin(); unit != this->needToAdd.end(); unit++)
+		{
+			if((*unit)->getType() == type)
+			{
+				amount++;
+			}
+		}
+	}
+	return amount;
 }
 
 bool ExampleAIModule::commandGroup(std::vector<Unit*> units, BWAPI::UnitCommand command) //returns true if all units could issue the command
@@ -1159,6 +1274,8 @@ void ExampleAIModule::onUnitCreate(BWAPI::Unit* unit)
 	if (unit->getPlayer() == Broodwar->self())
 	{
 		Broodwar->sendText("A %s [%x] has been created at (%d,%d)",unit->getType().getName().c_str(),unit,unit->getPosition().x(),unit->getPosition().y());
+		//Our logic for inserting it into our lists
+		this->needToAdd.insert(unit);
 	}
 }
 
@@ -1367,6 +1484,6 @@ void ExampleAIModule::onUnitComplete(BWAPI::Unit *unit)
 	{
 		//Add it to our list of needToAdd
 		/*if(!unit->getType().isBuilding())*/
-			this->needToAdd.insert(unit);
+		/*this->needToAdd.insert(unit);*/
 	}
 }

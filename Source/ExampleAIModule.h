@@ -70,6 +70,8 @@ public:
 	std::vector<Unit*> findAndHire(int hireID, BWAPI::UnitType type, int amount);
 	int findAndChange(int origID, int resultID);
 	int findAndChange(int origID, int resultID, BWAPI::UnitType type);
+
+	int getUnitCount(UnitType type, bool completedOnly = false);
 	
 	bool commandGroup(std::vector<Unit*> units, BWAPI::UnitCommand command);
 	Unit* getClosestUnit(Unit* mine, BWAPI::UnitType targetType);
