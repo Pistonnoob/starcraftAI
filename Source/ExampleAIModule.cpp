@@ -50,9 +50,7 @@ void ExampleAIModule::onStart()
 			this->commandCenters.push_back(*i);
 		}
 	}
-	
-	//Create the commander
-	this->rallyCommander = Commander();
+
 
 }
 
@@ -790,8 +788,7 @@ void ExampleAIModule::onFrame()
 						this->builders2.push_back(std::pair<Unit*, int>((*unit), 0));	//Start it off with a HiredID of 0. May change in the future.
 					}else
 					{
-						this->rallyCommander.assignUnit((*unit), 0);
-						//this->army.push_back(std::pair<Unit*, int>((*unit), 0));		//Start new army units off with a ID of 0.
+						this->army.push_back(std::pair<Unit*, int>((*unit), 0));		//Start new army units off with a ID of 0.
 					}
 				}else
 				{
@@ -807,120 +804,119 @@ void ExampleAIModule::onFrame()
 
 	//Do the army behavior
 #pragma region
-	this->rallyCommander.update();
-//	for(std::vector<std::pair<Unit*, int>>::iterator armyUnit = this->army.begin(); armyUnit != this->army.end(); armyUnit++)
-//	{
-//		BWAPI::UnitType type = armyUnit->first->getType();
-//		if(type == UnitTypes::Terran_Marine)
-//		{	//Do the marine behavior
-//#pragma region
-//			//Check stim pack cooldown
-//			if(armyUnit->first->getSpellCooldown() == 0)
-//			{
-//				//Check if health is above 50%. If so, use stim pack ability
-//				if(armyUnit->first->getHitPoints() >= armyUnit->first->getType().maxHitPoints() * 0.5)
-//				{
-//					TechType techToUse = TechTypes::Stim_Packs;
-//					if(armyUnit->first->getEnergy() >= techToUse.energyUsed())
-//					{
-//						if(Broodwar->self()->hasResearched(techToUse))
-//						{
-//							//The set of abilities the unit has the tech and energy to use
-//							std::set<BWAPI::TechType> abilities = type.abilities();
-//							//Check for a techToUse
-//							if(!abilities.empty() || abilities.find(techToUse) != abilities.end())
-//							{	//Found the stim pack ability
-//								if(!armyUnit->first->useTech(techToUse))
-//								{	//Invalid tech
-//									Broodwar->printf("%s failed to use %s because it was invalid!", type.c_str(), techToUse.c_str());
-//								}	
-//							}
-//						}
-//					}
-//				
-//				}
-//			}
-//#pragma endregion Marine behavior
-//		}else if(type == UnitTypes::Terran_Siege_Tank_Tank_Mode || type == UnitTypes::Terran_Siege_Tank_Siege_Mode)
-//		{	//Do the tank behavior
-//#pragma region
-//			
-//			TechType techToUse = TechTypes::Tank_Siege_Mode;
-//			if(Broodwar->self()->hasResearched(techToUse))
-//			{
-//				//If there is a unit within sighrange, go into siege mode, if not then proceed in tank mode
-//				//check if there are units nearby
-//				std::set<Unit*> unitsInRange = armyUnit->first->getUnitsInRadius(type.sightRange());
-//				if(!unitsInRange.empty())
-//				{
-//					if(armyUnit->first->getType() == UnitTypes::Terran_Siege_Tank_Tank_Mode)
-//					{
-//						//Try to go into siege mode
-//						//The set of abilities the unit has the tech and energy to use
-//						std::set<BWAPI::TechType> abilities = type.abilities();
-//						//Check for a techToUse
-//						if(!abilities.empty() || abilities.find(techToUse) != abilities.end())
-//						{	//Found the stim pack ability
-//							if(!armyUnit->first->useTech(techToUse))
-//							{	//Invalid tech
-//								Broodwar->printf("%s could not go into %s!", type.c_str(), UnitTypes::Terran_Siege_Tank_Siege_Mode.c_str());
-//							}	
-//						}
-//					}
-//				}else
-//				{
-//					if(armyUnit->first->getType() == UnitTypes::Terran_Siege_Tank_Siege_Mode)
-//					{
-//						//Try to go into tank mode
-//						//The set of abilities the unit has the tech and energy to use
-//						std::set<BWAPI::TechType> abilities = type.abilities();
-//						//Check for a techToUse
-//						if(!abilities.empty() || abilities.find(techToUse) != abilities.end())
-//						{	//Found the stim pack ability
-//							if(!armyUnit->first->useTech(techToUse))
-//							{	//Invalid tech
-//								Broodwar->printf("%s could not go into %s!", type.c_str(), UnitTypes::Terran_Siege_Tank_Tank_Mode.c_str());
-//							}	
-//						}
-//					}
-//				}
-//			}
-//#pragma endregion Tank behavior
-//		}else if(type == UnitTypes::Terran_Medic)
-//		{	//Do the medic behavior
-//#pragma region
-//			//Check if cooldown on healing is off
-//			if(armyUnit->first->getSpellCooldown() <= 0)
-//			{
-//				//Get units in range and find the least healthy unit as healing target
-//				std::set<Unit*> inRange = armyUnit->first->getUnitsInWeaponRange(type.groundWeapon());
-//				std::pair<Unit*,int> leastHealth(NULL, -1);
-//				for(std::set<Unit*>::iterator inRangeUnit = inRange.begin(); inRangeUnit != inRange.end(); inRangeUnit++)
-//				{
-//					if((*inRangeUnit)->getPlayer() == Broodwar->self())
-//					{
-//						int curHP = (*inRangeUnit)->getHitPoints();
-//						if(leastHealth.first != NULL || curHP < leastHealth.second)
-//						{
-//							leastHealth.first = (*inRangeUnit);
-//							leastHealth.second = (*inRangeUnit)->getHitPoints();
-//						}
-//					}
-//				}
-//				if(leastHealth.first != NULL)
-//				{
-//					if(!(*armyUnit).first->useTech(TechTypes::Healing, leastHealth.first))
-//					{	//Invalid tech
-//						Broodwar->printf("%s could not use %s on %s!", type.c_str(), TechTypes::Healing.c_str(), leastHealth.first->getType().c_str());
-//					}
-//				}
-//			}
-//			
-//#pragma endregion Medic behavior
-//		}else
-//		{	//Some unknown unit. Don't print anything, if there is a problem it will show on every frame which will be extremly anoying
-//		}
-//	}
+	for(std::vector<std::pair<Unit*, int>>::iterator armyUnit = this->army.begin(); armyUnit != this->army.end(); armyUnit++)
+	{
+		BWAPI::UnitType type = armyUnit->first->getType();
+		if(type == UnitTypes::Terran_Marine)
+		{	//Do the marine behavior
+#pragma region
+			//Check stim pack cooldown
+			if(armyUnit->first->getSpellCooldown() == 0)
+			{
+				//Check if health is above 50%. If so, use stim pack ability
+				if(armyUnit->first->getHitPoints() >= armyUnit->first->getType().maxHitPoints() * 0.5)
+				{
+					TechType techToUse = TechTypes::Stim_Packs;
+					if(armyUnit->first->getEnergy() >= techToUse.energyUsed())
+					{
+						if(Broodwar->self()->hasResearched(techToUse))
+						{
+							//The set of abilities the unit has the tech and energy to use
+							std::set<BWAPI::TechType> abilities = type.abilities();
+							//Check for a techToUse
+							if(!abilities.empty() || abilities.find(techToUse) != abilities.end())
+							{	//Found the stim pack ability
+								if(!armyUnit->first->useTech(techToUse))
+								{	//Invalid tech
+									Broodwar->printf("%s failed to use %s because it was invalid!", type.c_str(), techToUse.c_str());
+								}	
+							}
+						}
+					}
+				
+				}
+			}
+#pragma endregion Marine behavior
+		}else if(type == UnitTypes::Terran_Siege_Tank_Tank_Mode || type == UnitTypes::Terran_Siege_Tank_Siege_Mode)
+		{	//Do the tank behavior
+#pragma region
+			
+			TechType techToUse = TechTypes::Tank_Siege_Mode;
+			if(Broodwar->self()->hasResearched(techToUse))
+			{
+				//If there is a unit within sighrange, go into siege mode, if not then proceed in tank mode
+				//check if there are units nearby
+				std::set<Unit*> unitsInRange = armyUnit->first->getUnitsInRadius(type.sightRange());
+				if(!unitsInRange.empty())
+				{
+					if(armyUnit->first->getType() == UnitTypes::Terran_Siege_Tank_Tank_Mode)
+					{
+						//Try to go into siege mode
+						//The set of abilities the unit has the tech and energy to use
+						std::set<BWAPI::TechType> abilities = type.abilities();
+						//Check for a techToUse
+						if(!abilities.empty() || abilities.find(techToUse) != abilities.end())
+						{	//Found the stim pack ability
+							if(!armyUnit->first->useTech(techToUse))
+							{	//Invalid tech
+								Broodwar->printf("%s could not go into %s!", type.c_str(), UnitTypes::Terran_Siege_Tank_Siege_Mode.c_str());
+							}	
+						}
+					}
+				}else
+				{
+					if(armyUnit->first->getType() == UnitTypes::Terran_Siege_Tank_Siege_Mode)
+					{
+						//Try to go into tank mode
+						//The set of abilities the unit has the tech and energy to use
+						std::set<BWAPI::TechType> abilities = type.abilities();
+						//Check for a techToUse
+						if(!abilities.empty() || abilities.find(techToUse) != abilities.end())
+						{	//Found the stim pack ability
+							if(!armyUnit->first->useTech(techToUse))
+							{	//Invalid tech
+								Broodwar->printf("%s could not go into %s!", type.c_str(), UnitTypes::Terran_Siege_Tank_Tank_Mode.c_str());
+							}	
+						}
+					}
+				}
+			}
+#pragma endregion Tank behavior
+		}else if(type == UnitTypes::Terran_Medic)
+		{	//Do the medic behavior
+#pragma region
+			//Check if cooldown on healing is off
+			if(armyUnit->first->getSpellCooldown() <= 0)
+			{
+				//Get units in range and find the least healthy unit as healing target
+				std::set<Unit*> inRange = armyUnit->first->getUnitsInWeaponRange(type.groundWeapon());
+				std::pair<Unit*,int> leastHealth(NULL, -1);
+				for(std::set<Unit*>::iterator inRangeUnit = inRange.begin(); inRangeUnit != inRange.end(); inRangeUnit++)
+				{
+					if((*inRangeUnit)->getPlayer() == Broodwar->self())
+					{
+						int curHP = (*inRangeUnit)->getHitPoints();
+						if(leastHealth.first != NULL || curHP < leastHealth.second)
+						{
+							leastHealth.first = (*inRangeUnit);
+							leastHealth.second = (*inRangeUnit)->getHitPoints();
+						}
+					}
+				}
+				if(leastHealth.first != NULL)
+				{
+					if(!(*armyUnit).first->useTech(TechTypes::Healing, leastHealth.first))
+					{	//Invalid tech
+						Broodwar->printf("%s could not use %s on %s!", type.c_str(), TechTypes::Healing.c_str(), leastHealth.first->getType().c_str());
+					}
+				}
+			}
+			
+#pragma endregion Medic behavior
+		}else
+		{	//Some unknown unit. Don't print anything, if there is a problem it will show on every frame which will be extremly anoying
+		}
+	}
 #pragma endregion Army behavior
 
 #pragma endregion Frame dependant behavior
@@ -1307,15 +1303,14 @@ void ExampleAIModule::onUnitDestroy(BWAPI::Unit* unit)
 			}else
 			{
 				//It is PROBABLY a army unit
-				this->rallyCommander.removeUnit(unit);
-				/*for(std::vector<std::pair<Unit*, int>>::iterator armyUnit = this->army.begin(); armyUnit != this->army.end(); armyUnit++)
+				for(std::vector<std::pair<Unit*, int>>::iterator armyUnit = this->army.begin(); armyUnit != this->army.end(); armyUnit++)
 				{
 					if((*armyUnit).first->getID() == unit->getID())
 					{
 						this->army.erase(armyUnit);
 						break;
 					}
-				}*/
+				}
 			}
 		}else
 		{
