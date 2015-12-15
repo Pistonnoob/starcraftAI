@@ -753,7 +753,7 @@ int ExampleAIModule::updateUnitMovements(bool forceUpdate)	//Returns the amount 
 		//If the unit isn't bussy dying in the name of the Terran Empire
 		Unit* orderTarget = armyUnit->first->getOrderTarget();
 
-		if(!armyUnit->first->isAttacking() || orderTarget != NULL/*|| forceUpdate*/)
+		if(!armyUnit->first->isAttacking() || !armyUnit->first->isUnderAttack() || orderTarget != NULL/*|| forceUpdate*/)
 		{
 			//If unit can walk
 			if(armyUnit->first->getType().canMove())
@@ -954,33 +954,56 @@ void ExampleAIModule::onFrame()
 			TechType techToUse = TechTypes::Tank_Siege_Mode;
 			if(Broodwar->self()->hasResearched(techToUse))
 			{
-				//If there is a unit within sightrange, go into siege mode, if not then proceed in tank mode
-				//check if there are units nearby
-				std::set<Unit*> unitsInRange = armyUnit->first->getUnitsInRadius(Broodwar->self()->sightRange(type));
-				bool foundEnemy = false;
-				if(!unitsInRange.empty())
+				if(armyUnit->first->isInterruptible())
 				{
-					for(std::set<Unit*>::iterator unitInRange = unitsInRange.begin(); unitInRange != unitsInRange.end() && !foundEnemy; unitInRange++)
+					//If there is a unit within sightrange, go into siege mode, if not then proceed in tank mode
+					//check if there are units nearby
+					std::set<Unit*> unitsInRange = armyUnit->first->getUnitsInRadius(Broodwar->self()->sightRange(type));
+					bool foundEnemy = false;
+					if(!unitsInRange.empty())
 					{
-						Player* pl = (*unitInRange)->getPlayer();
-						//if(pl->getType() != PlayerTypes::None && pl->getType() != PlayerTypes::Neutral && pl->getType() != PlayerTypes::Unknown)
-						if(pl == Broodwar->enemy())
+						for(std::set<Unit*>::iterator unitInRange = unitsInRange.begin(); unitInRange != unitsInRange.end() && !foundEnemy; unitInRange++)
 						{
-							foundEnemy = true;
+							Player* pl = (*unitInRange)->getPlayer();
+							//if(pl->getType() != PlayerTypes::None && pl->getType() != PlayerTypes::Neutral && pl->getType() != PlayerTypes::Unknown)
+							if(pl == Broodwar->enemy())
+							{
+								foundEnemy = true;
+							}
+						}
+						if(foundEnemy)
+						{
+							if(armyUnit->first->getType() == UnitTypes::Terran_Siege_Tank_Tank_Mode)
+							{
+								//Try to go into siege mode
+								
+								/*BWAPI::UnitCommand command = BWAPI::UnitCommand::unsiege(armyUnit->first);
+								if(armyUnit->first->canIssueCommand(command))
+									if(armyUnit->first->issueCommand(command))
+									{
+										Broodwar->printf("%s could not go into %s!", type.c_str(), UnitTypes::Terran_Siege_Tank_Siege_Mode.c_str());
+									}*/
+								//The set of abilities the unit has the tech and energy to use
+								std::set<BWAPI::TechType> abilities = type.abilities();
+								//Check for a techToUse
+								if(!abilities.empty() || abilities.find(techToUse) != abilities.end())
+								{	//Found the stim pack ability
+									if(!armyUnit->first->useTech(techToUse))
+									{	//Invalid tech
+										Broodwar->printf("%s could not go into %s!", type.c_str(), UnitTypes::Terran_Siege_Tank_Siege_Mode.c_str());
+									}	
+								}
+							}
 						}
 					}
-					if(foundEnemy)
+					if(!foundEnemy)
 					{
-						if(armyUnit->first->getType() == UnitTypes::Terran_Siege_Tank_Tank_Mode)
+						if(armyUnit->first->getType() == UnitTypes::Terran_Siege_Tank_Siege_Mode)
 						{
-							//Try to go into siege mode
-							
-							/*BWAPI::UnitCommand command = BWAPI::UnitCommand::unsiege(armyUnit->first);
+							//Try to go into tank mode
+							/*BWAPI::UnitCommand command = BWAPI::UnitCommand::siege(armyUnit->first);
 							if(armyUnit->first->canIssueCommand(command))
-								if(armyUnit->first->issueCommand(command))
-								{
-									Broodwar->printf("%s could not go into %s!", type.c_str(), UnitTypes::Terran_Siege_Tank_Siege_Mode.c_str());
-								}*/
+								armyUnit->first->issueCommand(command);*/
 							//The set of abilities the unit has the tech and energy to use
 							std::set<BWAPI::TechType> abilities = type.abilities();
 							//Check for a techToUse
@@ -988,29 +1011,9 @@ void ExampleAIModule::onFrame()
 							{	//Found the stim pack ability
 								if(!armyUnit->first->useTech(techToUse))
 								{	//Invalid tech
-									Broodwar->printf("%s could not go into %s!", type.c_str(), UnitTypes::Terran_Siege_Tank_Siege_Mode.c_str());
+									Broodwar->printf("%s could not go into %s!", type.c_str(), UnitTypes::Terran_Siege_Tank_Tank_Mode.c_str());
 								}	
 							}
-						}
-					}
-				}
-				if(!foundEnemy)
-				{
-					if(armyUnit->first->getType() == UnitTypes::Terran_Siege_Tank_Siege_Mode)
-					{
-						//Try to go into tank mode
-						/*BWAPI::UnitCommand command = BWAPI::UnitCommand::siege(armyUnit->first);
-						if(armyUnit->first->canIssueCommand(command))
-							armyUnit->first->issueCommand(command);*/
-						//The set of abilities the unit has the tech and energy to use
-						std::set<BWAPI::TechType> abilities = type.abilities();
-						//Check for a techToUse
-						if(!abilities.empty() || abilities.find(techToUse) != abilities.end())
-						{	//Found the stim pack ability
-							if(!armyUnit->first->useTech(techToUse))
-							{	//Invalid tech
-								Broodwar->printf("%s could not go into %s!", type.c_str(), UnitTypes::Terran_Siege_Tank_Tank_Mode.c_str());
-							}	
 						}
 					}
 				}
