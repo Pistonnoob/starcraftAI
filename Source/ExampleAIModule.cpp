@@ -417,7 +417,7 @@ void ExampleAIModule::step2()
 			{
 				std::vector<Unit*> hiredWorkers = this->findWorker(21, UnitTypes::Terran_SCV);
 				if(hiredWorkers.empty())
-					hiredWorkers = this->findAndHire(21, UnitTypes::Terran_SCV, 1);
+					hiredWorkers = this->findAndHire(21,  UnitTypes::Terran_SCV, 1);
 				if(!hiredWorkers.empty())
 				{
 					std::vector<BWAPI::TilePosition> buildingSites = this->findBuildingSites(hiredWorkers[0], UnitTypes::Terran_Academy, 3, this->commandCenters[0]);
@@ -433,7 +433,7 @@ void ExampleAIModule::step2()
 			{
 				std::vector<Unit*> hiredWorkers = this->findWorker(21, UnitTypes::Terran_SCV);
 				if(hiredWorkers.empty())
-					hiredWorkers = this->findAndHire(21, UnitTypes::Terran_SCV, 1);					
+					hiredWorkers = this->findAndHire(21,  UnitTypes::Terran_SCV, 1);					
 				if(!hiredWorkers.empty() && !this->commandCenters.empty())
 				{
 					std::vector<BWAPI::TilePosition> buildingSites = this->findBuildingSites(hiredWorkers[0], UnitTypes::Terran_Refinery, 1, this->commandCenters[0]);
@@ -519,7 +519,7 @@ void ExampleAIModule::step2()
 		{
 			std::vector<Unit*> hiredWorkers = this->findWorker(26, UnitTypes::Terran_SCV);
 			if(hiredWorkers.empty())
-				hiredWorkers = this->findAndHire(26, UnitTypes::Terran_SCV, 1);					
+				hiredWorkers = this->findAndHire(26,  UnitTypes::Terran_SCV, 1);					
 			if(!hiredWorkers.empty() && !this->commandCenters.empty())
 			{
 				std::vector<BWAPI::TilePosition> buildingSites = this->findBuildingSites(hiredWorkers[0], UnitTypes::Terran_Supply_Depot, 1, this->commandCenters[0]);
@@ -583,7 +583,7 @@ void ExampleAIModule::step3()
 		{
 			std::vector<Unit*> hiredWorkers = this->findWorker(36, UnitTypes::Terran_SCV);
 			if(hiredWorkers.empty())
-				hiredWorkers = this->findAndHire(36, UnitTypes::Terran_SCV, 1);					
+				hiredWorkers = this->findAndHire(36,  UnitTypes::Terran_SCV, 1);					
 			if(!hiredWorkers.empty() && !this->commandCenters.empty())
 			{
 				std::vector<BWAPI::TilePosition> buildingSites = this->findBuildingSites(hiredWorkers[0], UnitTypes::Terran_Supply_Depot, 1, this->commandCenters[0]);
@@ -722,7 +722,7 @@ void ExampleAIModule::step3()
 		{
 			std::vector<Unit*> hiredWorkers = this->findWorker(39, UnitTypes::Terran_SCV);
 			if(hiredWorkers.empty())
-				hiredWorkers = this->findAndHire(39, UnitTypes::Terran_SCV, 1);					
+				hiredWorkers = this->findAndHire(39,  UnitTypes::Terran_SCV, 1);					
 			if(!hiredWorkers.empty() && !this->commandCenters.empty())
 			{
 				std::vector<BWAPI::TilePosition> buildingSites = this->findBuildingSites(hiredWorkers[0], UnitTypes::Terran_Supply_Depot, 1, this->commandCenters[0]);
@@ -751,7 +751,9 @@ int ExampleAIModule::updateUnitMovements(bool forceUpdate)	//Returns the amount 
 	for(std::vector<std::pair<Unit*, int>>::iterator armyUnit = this->army.begin(); armyUnit != this->army.end(); armyUnit++)
 	{
 		//If the unit isn't bussy dying in the name of the Terran Empire
-		if(!armyUnit->first->isAttacking() /*|| forceUpdate*/)
+		Unit* orderTarget = armyUnit->first->getOrderTarget();
+
+		if(!armyUnit->first->isAttacking() || orderTarget != NULL/*|| forceUpdate*/)
 		{
 			//If unit can walk
 			if(armyUnit->first->getType().canMove())
@@ -760,7 +762,8 @@ int ExampleAIModule::updateUnitMovements(bool forceUpdate)	//Returns the amount 
 				{
 					//It is at least trying to get to the rally point
 					result += 1;
-					armyUnit->first->holdPosition(true);
+					if(!armyUnit->first->isHoldingPosition() && armyUnit->first->getPosition().getDistance(this->rallyPos) < this->rallyArea)
+						armyUnit->first->holdPosition(false);
 				}else
 				{
 					if(armyUnit->first->attack(this->rallyPos, !forceUpdate))
@@ -951,7 +954,7 @@ void ExampleAIModule::onFrame()
 			TechType techToUse = TechTypes::Tank_Siege_Mode;
 			if(Broodwar->self()->hasResearched(techToUse))
 			{
-				//If there is a unit within sighrange, go into siege mode, if not then proceed in tank mode
+				//If there is a unit within sightrange, go into siege mode, if not then proceed in tank mode
 				//check if there are units nearby
 				std::set<Unit*> unitsInRange = armyUnit->first->getUnitsInRadius(Broodwar->self()->sightRange(type));
 				bool foundEnemy = false;
@@ -966,26 +969,28 @@ void ExampleAIModule::onFrame()
 							foundEnemy = true;
 						}
 					}
-					
 					if(foundEnemy)
 					{
 						if(armyUnit->first->getType() == UnitTypes::Terran_Siege_Tank_Tank_Mode)
 						{
 							//Try to go into siege mode
 							
-							BWAPI::UnitCommand command = BWAPI::UnitCommand::unsiege(armyUnit->first);
+							/*BWAPI::UnitCommand command = BWAPI::UnitCommand::unsiege(armyUnit->first);
 							if(armyUnit->first->canIssueCommand(command))
-								armyUnit->first->issueCommand(command);
+								if(armyUnit->first->issueCommand(command))
+								{
+									Broodwar->printf("%s could not go into %s!", type.c_str(), UnitTypes::Terran_Siege_Tank_Siege_Mode.c_str());
+								}*/
 							//The set of abilities the unit has the tech and energy to use
-							//std::set<BWAPI::TechType> abilities = type.abilities();
-							////Check for a techToUse
-							//if(!abilities.empty() || abilities.find(techToUse) != abilities.end())
-							//{	//Found the stim pack ability
-							//	if(!armyUnit->first->useTech(techToUse))
-							//	{	//Invalid tech
-							//		//Broodwar->printf("%s could not go into %s!", type.c_str(), UnitTypes::Terran_Siege_Tank_Siege_Mode.c_str());
-							//	}	
-							//}
+							std::set<BWAPI::TechType> abilities = type.abilities();
+							//Check for a techToUse
+							if(!abilities.empty() || abilities.find(techToUse) != abilities.end())
+							{	//Found the stim pack ability
+								if(!armyUnit->first->useTech(techToUse))
+								{	//Invalid tech
+									Broodwar->printf("%s could not go into %s!", type.c_str(), UnitTypes::Terran_Siege_Tank_Siege_Mode.c_str());
+								}	
+							}
 						}
 					}
 				}
@@ -994,19 +999,19 @@ void ExampleAIModule::onFrame()
 					if(armyUnit->first->getType() == UnitTypes::Terran_Siege_Tank_Siege_Mode)
 					{
 						//Try to go into tank mode
-						BWAPI::UnitCommand command = BWAPI::UnitCommand::siege(armyUnit->first);
+						/*BWAPI::UnitCommand command = BWAPI::UnitCommand::siege(armyUnit->first);
 						if(armyUnit->first->canIssueCommand(command))
-							armyUnit->first->issueCommand(command);
+							armyUnit->first->issueCommand(command);*/
 						//The set of abilities the unit has the tech and energy to use
-						//std::set<BWAPI::TechType> abilities = type.abilities();
-						////Check for a techToUse
-						//if(!abilities.empty() || abilities.find(techToUse) != abilities.end())
-						//{	//Found the stim pack ability
-						//	if(!armyUnit->first->useTech(techToUse))
-						//	{	//Invalid tech
-						//		Broodwar->printf("%s could not go into %s!", type.c_str(), UnitTypes::Terran_Siege_Tank_Tank_Mode.c_str());
-						//	}	
-						//}
+						std::set<BWAPI::TechType> abilities = type.abilities();
+						//Check for a techToUse
+						if(!abilities.empty() || abilities.find(techToUse) != abilities.end())
+						{	//Found the stim pack ability
+							if(!armyUnit->first->useTech(techToUse))
+							{	//Invalid tech
+								Broodwar->printf("%s could not go into %s!", type.c_str(), UnitTypes::Terran_Siege_Tank_Tank_Mode.c_str());
+							}	
+						}
 					}
 				}
 			}
@@ -1190,20 +1195,21 @@ std::vector<Unit*> ExampleAIModule::findAndHire(int hireID, BWAPI::UnitType type
 {
 	std::vector<Unit*> result;
 	int hireCnt = 0;
+
 	for(std::vector<std::pair<Unit *, int>>::iterator i = this->builders2.begin(); i != this->builders2.end() && hireCnt < amount; i++)
+	{
+		//We are now accessing the pair structure with the builders and their assigned states. Hire a builder and set their ID-state
+		if(i->first->getType() == type) //Check type
 		{
-			//We are now accessing the pair structure with the builders and their assigned states. Hire a builder and set their ID-state
-			if(i->first->getType() == type) //Check type
+			if(i->second == 0 || i->second == hireID)	//Check available
 			{
-				if(i->second == 0 || i->second == hireID)	//Check available
-				{
-					//Give it the ID-state which will represent it being issued this workload
-					i->second = hireID;		//2X for step 2, X1 for objective 1
-					result.push_back(i->first);	//Store the unit pointer, may be a better idéa to store the ID.
-					hireCnt++;	//Increase the hired unit counter.
-				}
+				//Give it the ID-state which will represent it being issued this workload
+				i->second = hireID;		//2X for step 2, X1 for objective 1
+				result.push_back(i->first);	//Store the unit pointer, may be a better idéa to store the ID.
+				hireCnt++;	//Increase the hired unit counter.
 			}
 		}
+	}
 	return result;
 }
 
