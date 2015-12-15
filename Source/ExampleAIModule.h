@@ -61,11 +61,12 @@ public:
 	void step3();
 	void step4();
 	
+	int updateUnitMovements(bool forceUpdate = false);
+	
 	void constructBuilding(std::vector<BWAPI::TilePosition> pos, Unit* worker, BWAPI::UnitType building);
 	void trainUnits(Unit* trainer, BWAPI::UnitType unit, int amount);
 	void researchTech(Unit* trainer = NULL, TechType = TechTypes::None);
 	bool hasResFor(UnitType type)const;
-	
 	
 
 	std::vector<Unit*> findWorker(int hireID, BWAPI::UnitType type = BWAPI::UnitTypes::Terran_SCV);
@@ -75,6 +76,7 @@ public:
 	int findAndChange(int origID, int resultID, BWAPI::UnitType type);
 
 	int getUnitCount(UnitType type, bool completedOnly = false);
+	bool updateRallyPoint(BWAPI::Position pos, int radius = -1, bool strict = false);
 	
 	bool commandGroup(std::vector<Unit*> units, BWAPI::UnitCommand command);
 	Unit* getClosestUnit(Unit* mine, BWAPI::UnitType targetType);

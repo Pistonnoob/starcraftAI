@@ -51,7 +51,7 @@ void ExampleAIModule::onStart()
 		}
 	}
 	this->rallyPos = this->findGuardPoint();
-	this->rallyArea = 80;
+	this->rallyArea = 120;
 	Broodwar->sendText("power overwhelming");
 }
 
@@ -429,7 +429,7 @@ void ExampleAIModule::step2()
 	case 1:		//Construct a Refinery
 		if(refineryCnt < 1)
 		{
-			if(this->hasResFor(UnitTypes::Terran_Refinery))
+			if(Broodwar->canMake(NULL, UnitTypes::Terran_Refinery))
 			{
 				std::vector<Unit*> hiredWorkers = this->findWorker(21, UnitTypes::Terran_SCV);
 				if(hiredWorkers.empty())
@@ -556,14 +556,14 @@ void ExampleAIModule::step3()
 		break;
 	case 3:		//Research the siege-tanks siege mode
 		//BWAPI::TechTypes
-		if(Broodwar->self()->hasResearched(BWAPI::TechTypes::Tank_Siege_Mode) && Broodwar->self()->completedUnitCount(BWAPI::UnitTypes::Terran_Machine_Shop) > 0/* || Broodwar->self()->isResearching(BWAPI::TechTypes::Tank_Siege_Mode)*/)
+		if(Broodwar->self()->completedUnitCount(BWAPI::UnitTypes::Terran_Machine_Shop) > 0 && Broodwar->self()->isResearching(BWAPI::TechTypes::Tank_Siege_Mode))
 		{
 			this->actObjective = 4;
 		}
 		
 		break;
 	case 4:
-		if(Broodwar->self()->completedUnitCount(UnitTypes::Terran_Siege_Tank_Siege_Mode) + Broodwar->self()->completedUnitCount(UnitTypes::Terran_Siege_Tank_Tank_Mode) > 2)
+		if(Broodwar->self()->hasResearched(BWAPI::TechTypes::Tank_Siege_Mode) && Broodwar->self()->completedUnitCount(UnitTypes::Terran_Siege_Tank_Siege_Mode) + Broodwar->self()->completedUnitCount(UnitTypes::Terran_Siege_Tank_Tank_Mode) > 2)
 		{
 			this->actObjective = 5;	
 		}
@@ -713,28 +713,66 @@ void ExampleAIModule::step3()
 	default:
 		break;
 	}
+
+	//Build a supply depot if needed
+	if(Broodwar->self()->supplyUsed() >= Broodwar->self()->supplyTotal())
+	{
+		//Build a supply depot
+		if(this->hasResFor(UnitTypes::Terran_Supply_Depot))
+		{
+			std::vector<Unit*> hiredWorkers = this->findWorker(39, UnitTypes::Terran_SCV);
+			if(hiredWorkers.empty())
+				hiredWorkers = this->findAndHire(39, UnitTypes::Terran_SCV, 1);					
+			if(!hiredWorkers.empty() && !this->commandCenters.empty())
+			{
+				std::vector<BWAPI::TilePosition> buildingSites = this->findBuildingSites(hiredWorkers[0], UnitTypes::Terran_Supply_Depot, 1, this->commandCenters[0]);
+				if(!buildingSites.empty())
+					this->constructBuilding(buildingSites, hiredWorkers[0], UnitTypes::Terran_Supply_Depot);
+			}
+		}
+	}else
+	{
+		this->findAndChange(39, 0, UnitTypes::Terran_SCV);
+	}
+
 #pragma endregion Completing objective
 }
 
 void ExampleAIModule::step4()
 {
 	//Set their new attack order along with the AIs new rally position
-	this->rallyPos = Position(Broodwar->enemy()->getStartLocation());
+	this->updateRallyPoint(Position(Broodwar->enemy()->getStartLocation()));
+	
+}
+
+int ExampleAIModule::updateUnitMovements(bool forceUpdate)	//Returns the amount of units that now move towards the target
+{
+	int result = 0;
 	for(std::vector<std::pair<Unit*, int>>::iterator armyUnit = this->army.begin(); armyUnit != this->army.end(); armyUnit++)
 	{
-		//If unit can walk
-		if(armyUnit->first->getType().canMove())
+		//If the unit isn't bussy dying in the name of the Terran Empire
+		if(!armyUnit->first->isAttacking() /*|| forceUpdate*/)
 		{
-			if(armyUnit->first->getTargetPosition().getDistance(this->rallyPos) < 20)
+			//If unit can walk
+			if(armyUnit->first->getType().canMove())
 			{
-				//It is at least trying to get to the rally point
-			}else
-				armyUnit->first->attack(this->rallyPos, true);
-			//armyUnit->first->attack(this->rallyPos, true);
-			//armyUnit->first->holdPosition(true);
-		}//If unit can walk
-		
+				if(armyUnit->first->getTargetPosition().getDistance(this->rallyPos) < this->rallyArea)
+				{
+					//It is at least trying to get to the rally point
+					result += 1;
+					armyUnit->first->holdPosition(true);
+				}else
+				{
+					if(armyUnit->first->attack(this->rallyPos, !forceUpdate))
+						result += 1;
+				}
+				//armyUnit->first->attack(this->rallyPos, true);
+				//armyUnit->first->holdPosition(true);
+			}
+		}
 	}
+	//Got all units to move
+	return result;
 }
 
 
@@ -915,7 +953,7 @@ void ExampleAIModule::onFrame()
 			{
 				//If there is a unit within sighrange, go into siege mode, if not then proceed in tank mode
 				//check if there are units nearby
-				std::set<Unit*> unitsInRange = armyUnit->first->getUnitsInRadius(type.sightRange());
+				std::set<Unit*> unitsInRange = armyUnit->first->getUnitsInRadius(Broodwar->self()->sightRange(type));
 				bool foundEnemy = false;
 				if(!unitsInRange.empty())
 				{
@@ -934,16 +972,20 @@ void ExampleAIModule::onFrame()
 						if(armyUnit->first->getType() == UnitTypes::Terran_Siege_Tank_Tank_Mode)
 						{
 							//Try to go into siege mode
+							
+							BWAPI::UnitCommand command = BWAPI::UnitCommand::unsiege(armyUnit->first);
+							if(armyUnit->first->canIssueCommand(command))
+								armyUnit->first->issueCommand(command);
 							//The set of abilities the unit has the tech and energy to use
-							std::set<BWAPI::TechType> abilities = type.abilities();
-							//Check for a techToUse
-							if(!abilities.empty() || abilities.find(techToUse) != abilities.end())
-							{	//Found the stim pack ability
-								if(!armyUnit->first->useTech(techToUse))
-								{	//Invalid tech
-									Broodwar->printf("%s could not go into %s!", type.c_str(), UnitTypes::Terran_Siege_Tank_Siege_Mode.c_str());
-								}	
-							}
+							//std::set<BWAPI::TechType> abilities = type.abilities();
+							////Check for a techToUse
+							//if(!abilities.empty() || abilities.find(techToUse) != abilities.end())
+							//{	//Found the stim pack ability
+							//	if(!armyUnit->first->useTech(techToUse))
+							//	{	//Invalid tech
+							//		//Broodwar->printf("%s could not go into %s!", type.c_str(), UnitTypes::Terran_Siege_Tank_Siege_Mode.c_str());
+							//	}	
+							//}
 						}
 					}
 				}
@@ -952,16 +994,19 @@ void ExampleAIModule::onFrame()
 					if(armyUnit->first->getType() == UnitTypes::Terran_Siege_Tank_Siege_Mode)
 					{
 						//Try to go into tank mode
+						BWAPI::UnitCommand command = BWAPI::UnitCommand::siege(armyUnit->first);
+						if(armyUnit->first->canIssueCommand(command))
+							armyUnit->first->issueCommand(command);
 						//The set of abilities the unit has the tech and energy to use
-						std::set<BWAPI::TechType> abilities = type.abilities();
-						//Check for a techToUse
-						if(!abilities.empty() || abilities.find(techToUse) != abilities.end())
-						{	//Found the stim pack ability
-							if(!armyUnit->first->useTech(techToUse))
-							{	//Invalid tech
-								Broodwar->printf("%s could not go into %s!", type.c_str(), UnitTypes::Terran_Siege_Tank_Tank_Mode.c_str());
-							}	
-						}
+						//std::set<BWAPI::TechType> abilities = type.abilities();
+						////Check for a techToUse
+						//if(!abilities.empty() || abilities.find(techToUse) != abilities.end())
+						//{	//Found the stim pack ability
+						//	if(!armyUnit->first->useTech(techToUse))
+						//	{	//Invalid tech
+						//		Broodwar->printf("%s could not go into %s!", type.c_str(), UnitTypes::Terran_Siege_Tank_Tank_Mode.c_str());
+						//	}	
+						//}
 					}
 				}
 			}
@@ -1003,7 +1048,7 @@ void ExampleAIModule::onFrame()
 	}
 #pragma endregion Army behavior
 
-#pragma endregion Frame dependant behavior
+#pragma endregion Every Frame Updates
 
 	//Check every second frame. Slightly less important behaviors such as the Idle Worker behavior
 #pragma region
@@ -1052,8 +1097,12 @@ void ExampleAIModule::onFrame()
 		}
 #pragma endregion Idle worker gathering behavior
 	}
-#pragma endregion SecondFrameUpdates
+#pragma endregion Second Frame Updates
 
+	if(Broodwar->getFrameCount() % 10 == 0)
+	{
+		this->updateUnitMovements(true);
+	}
 
 #pragma region
 	//Call every 100:th frame
@@ -1183,6 +1232,7 @@ int ExampleAIModule::findAndChange(int origID, int resultID, BWAPI::UnitType typ
 int ExampleAIModule::getUnitCount(UnitType type, bool completedOnly)
 {
 	//int amount = Broodwar->self()->completedUnitCount(type);
+	//The first one in line within the production queue has already been created, the others have not
 	int amount = 0;
 	std::pair<UnitType,int> factory = type.whatBuilds();
 	for(std::set<Unit*>::const_iterator unit = Broodwar->self()->getUnits().begin(); unit != Broodwar->self()->getUnits().end(); unit++)
@@ -1202,7 +1252,7 @@ int ExampleAIModule::getUnitCount(UnitType type, bool completedOnly)
 				std::list<UnitType> training = (*unit)->getTrainingQueue();
 				for(std::list<UnitType>::iterator inList = training.begin(); inList != training.end(); inList++)
 				{
-					if((*inList) == type)
+					if((*inList) == type && inList != training.begin())
 					{
 						amount++;
 					}
@@ -1221,6 +1271,21 @@ int ExampleAIModule::getUnitCount(UnitType type, bool completedOnly)
 		}
 	}*/
 	return amount;
+}
+
+bool ExampleAIModule::updateRallyPoint(BWAPI::Position pos, int radius, bool strict)//Will return true if Starcraft can find a path from the old position to the new
+{
+	bool result;
+	//Change the position, also store in the bool if starcrafts internal logic can find a path from the old rallypoint and the new
+	result = Broodwar->hasPath(this->rallyPos, pos);
+	if(!strict || result)
+	{
+		this->rallyPos = pos;
+		//Change the radius
+		if(radius > 0)
+			this->rallyArea = radius;
+	}
+	return result;
 }
 
 bool ExampleAIModule::commandGroup(std::vector<Unit*> units, BWAPI::UnitCommand command) //returns true if all units could issue the command
